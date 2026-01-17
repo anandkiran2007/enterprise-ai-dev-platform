@@ -6,7 +6,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fetchMemory, submitIdea, approveRequirements, configureGitHub, ProjectMemory } from '@/lib/api';
 import { Activity, Code, Cpu, Layers, Settings, Github } from 'lucide-react';
 
+import { UserButton, useAuth } from "@clerk/nextjs";
+
 export default function Dashboard() {
+  const { userId } = useAuth();
   const [memory, setMemory] = useState<ProjectMemory | null>(null);
   const [error, setError] = useState<boolean>(false);
   const [newIdea, setNewIdea] = useState('');
@@ -14,12 +17,14 @@ export default function Dashboard() {
   const [showConfig, setShowConfig] = useState(false);
   const [githubToken, setGithubToken] = useState('');
   const [configStatus, setConfigStatus] = useState('');
+  const [selectedDoc, setSelectedDoc] = useState<any>(null);
 
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!githubToken) return;
     setConfigStatus('Saving...');
-    const success = await configureGitHub(githubToken);
+    const uid = userId || undefined;
+    const success = await configureGitHub(githubToken, uid);
     if (success) {
       setConfigStatus('Saved!');
       setTimeout(() => {
@@ -36,7 +41,8 @@ export default function Dashboard() {
     if (!newIdea.trim()) return;
 
     setIsSubmitting(true);
-    const success = await submitIdea(newIdea);
+    const uid = userId || undefined;
+    const success = await submitIdea(newIdea, uid);
     if (success) {
       setNewIdea('');
       alert('Project idea submitted to agents!');
@@ -48,7 +54,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     const interval = setInterval(async () => {
-      const data = await fetchMemory();
+      const uid = userId || undefined;
+      const data = await fetchMemory(uid);
       if (data) {
         setMemory(data);
         setError(false);
@@ -57,7 +64,7 @@ export default function Dashboard() {
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [userId]);
 
   if (error && !memory) {
     return (
@@ -123,6 +130,56 @@ export default function Dashboard() {
         )}
       </AnimatePresence>
 
+      {/* Document Viewer Modal */}
+      <AnimatePresence>
+        {selectedDoc && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-4xl h-[80vh] flex flex-col shadow-2xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between p-6 border-b border-gray-800 bg-gray-900 sticky top-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-500/10 rounded-lg">
+                    <Layers className="text-purple-400" size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-white capitalize">{selectedDoc.title.replace('_', ' ')}</h2>
+                    <p className="text-gray-400 text-sm">Last Updated: {new Date().toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedDoc(null)}
+                  className="p-2 hover:bg-gray-800 rounded-full transition-colors"
+                >
+                  <span className="sr-only">Close</span>
+                  <Settings className="rotate-45" size={24} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 bg-gray-950 font-mono text-sm text-gray-300">
+                <pre className="whitespace-pre-wrap leading-relaxed">
+                  {typeof selectedDoc.content === 'object'
+                    ? JSON.stringify(selectedDoc.content, null, 2)
+                    : selectedDoc.content || 'No content available.'}
+                </pre>
+              </div>
+
+              <div className="p-4 border-t border-gray-800 bg-gray-900 flex justify-end">
+                <button
+                  onClick={() => setSelectedDoc(null)}
+                  className="px-4 py-2 bg-white text-black font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       <header className="flex flex-col gap-8 mb-12">
         <div className="flex justify-between items-center">
           <div>
@@ -139,8 +196,14 @@ export default function Dashboard() {
             >
               <Settings size={20} />
             </button>
+
+
             <div className="bg-gray-900 px-4 py-2 rounded-full border border-gray-800 flex items-center gap-2">
               <span className="text-sm font-medium">{memory.current_phase.toUpperCase()} PHASE</span>
+            </div>
+
+            <div className="bg-gray-900 rounded-full border border-gray-800">
+              <UserButton afterSignOutUrl="/" />
             </div>
 
             {/* GitHub Repo Button */}
@@ -299,12 +362,17 @@ export default function Dashboard() {
             </div>
             <div className="space-y-3">
               {Object.entries(memory.living_documents).map(([key, doc]: [string, any]) => (
-                <div key={key} className="flex items-center gap-3 p-3 rounded bg-gray-800/50 hover:bg-gray-800 transition-colors cursor-pointer border border-transparent hover:border-gray-700">
+                <div
+                  key={key}
+                  onClick={() => setSelectedDoc({ title: key, ...doc })}
+                  className="flex items-center gap-3 p-3 rounded bg-gray-800/50 hover:bg-gray-800 transition-colors cursor-pointer border border-transparent hover:border-gray-700 active:scale-95 transform duration-100"
+                >
                   <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-200 capitalize">{key.replace('_', ' ')}</div>
-                    <div className="text-xs text-gray-500 truncate max-w-[200px]">{doc.summary || 'No summary'}</div>
+                    <div className="text-xs text-gray-500 truncate">{doc.summary || 'No summary'}</div>
                   </div>
+                  <div className="text-xs text-gray-600">View &rarr;</div>
                 </div>
               ))}
               {Object.keys(memory.living_documents).length === 0 && (

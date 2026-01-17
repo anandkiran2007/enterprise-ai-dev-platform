@@ -94,10 +94,15 @@ export abstract class BaseAgent {
         }
 
         const checklistMd = `\n\n## Current Checklist\n` + items.map(item => `- [ ] ${item}`).join('\n');
-
-        // Naive update: Append or replace? For simplicity, we'll PREPEND it or separate sections.
-        // Better strategy: Keep checklist at top, log at bottom.
-        // For MVP: Just append a new checklist block to show updated focus.
         fs.appendFileSync(logFile, checklistMd);
+    }
+
+    protected replacePlaceholders(template: string, variables: Record<string, string>): string {
+        return template.replace(/{{(\w+)}}/g, (_, key) => variables[key] || '');
+    }
+
+    protected extractCodeBlock(response: string): string | null {
+        const match = response.match(/```(?:\w+)?\s*([\s\S]*?)```/);
+        return match ? match[1].trim() : null;
     }
 }

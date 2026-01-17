@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Check, X } from 'lucide-react';
+import { createCheckoutSession } from '@/lib/api';
+import { useAuth, useUser } from "@clerk/nextjs";
+import { useState } from 'react';
 
 const plans = [
     {
@@ -30,6 +33,7 @@ const plans = [
     {
         name: 'Pro',
         price: '$29',
+        priceId: 'price_12345', // Placeholder, handled in backend for now
         period: '/month',
         description: 'For professional developers and teams.',
         features: [
@@ -70,6 +74,30 @@ const plans = [
 ];
 
 export default function PricingPage() {
+    const { userId } = useAuth();
+    const { user } = useUser();
+    const [loading, setLoading] = useState(false);
+
+    const handleUpgrade = async () => {
+        if (!userId || !user?.primaryEmailAddress) {
+            alert("Please sign in to upgrade.");
+            return;
+        }
+
+        setLoading(true);
+        const url = await createCheckoutSession(user.primaryEmailAddress.emailAddress, userId);
+        if (url) {
+            window.location.href = url;
+        } else {
+            if (url) {
+                window.location.href = url;
+            } else {
+                alert("Failed to start checkout. Check Backend Terminal Logs for details.");
+                setLoading(false);
+            }
+        }
+    };
+
     return (
         <div className="min-h-screen bg-black text-white p-8 font-sans">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -126,12 +154,14 @@ export default function PricingPage() {
                             </div>
 
                             <button
+                                onClick={plan.popular ? handleUpgrade : undefined}
+                                disabled={loading && plan.popular}
                                 className={`w-full py-3 rounded-lg font-bold text-sm transition-all transform hover:scale-105 ${plan.popular
-                                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg'
-                                        : 'bg-white text-black hover:bg-gray-200'
+                                    ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-lg disabled:opacity-50'
+                                    : 'bg-white text-black hover:bg-gray-200'
                                     }`}
                             >
-                                {plan.cta}
+                                {plan.popular && loading ? 'Redirecting...' : plan.cta}
                             </button>
                         </motion.div>
                     ))}

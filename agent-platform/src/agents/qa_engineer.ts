@@ -1,13 +1,16 @@
 
 import { BaseAgent } from './base';
 import { EventType } from '../core/events';
+import { ExecutionSandbox } from '../core/sandbox';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export class QAEngineerAgent extends BaseAgent {
 
     initialize() {
         this.eventBus.subscribe(EventType.FRONTEND_COMPONENT_READY, (event) => {
             console.log(`[QA Engineer] Frontend ready. Starting QA process.`);
-            this.startQA();
+            this.startQA(event.payload?.componentCode);
         });
     }
 
@@ -19,50 +22,85 @@ export class QAEngineerAgent extends BaseAgent {
     }
 
     async act(): Promise<boolean> {
-        const context = this.getContext();
-
-        if (context.my_current_task && context.my_current_task.currently_working_on === 'qa_testing') {
-            console.log('[QA Engineer] Running test suite...');
-            await this.performTests();
-            return true;
-        }
-
         return false;
     }
 
-    private startQA() {
+    private startQA(componentCode?: string) {
         this.memory.updatePhase('testing');
         this.memory.updateAgentContext(this.role, {
             currently_working_on: 'qa_testing',
             next_tasks: ['report_results']
         });
+
+        // Trigger asynchronous testing
+        this.performTests(componentCode).catch(err => {
+            console.error('[QA Engineer] Test execution failed:', err);
+            this.emitFailure('test_execution', err.message);
+        });
     }
 
-    private async performTests() {
-        // Artificial delay for visualization
-        await new Promise(resolve => setTimeout(resolve, 3000));
+    private async performTests(componentCode?: string) {
+        if (!componentCode) {
+            console.log('[QA Engineer] No code provided for testing.');
+            return;
+        }
 
-        // Use LLM to generate test cases
+        console.log('[QA Engineer] Generating test cases via LLM...');
         const { AGENT_PROMPTS } = require('../core/prompts');
-        const testReport = await this.llm.generateText([
-            { role: 'system', content: AGENT_PROMPTS.qa_engineer },
-            { role: 'user', content: 'Generate test cases for the login page.' }
-        ]);
 
-        console.log('[QA Engineer] Tests complete.');
-
-        this.memory.updateDocument('test_coverage', {
-            unit_tests: 'PASSED',
-            report: testReport
+        // 1. Generate Test Code
+        const prompt = this.replacePlaceholders(AGENT_PROMPTS.qa_engineer, {
+            role: this.role,
+            context: `Component Code:\n${componentCode}\n\nTask: Write a Jest/Node test script for this component. Ensure it console.logs 'PASS' on success.`
         });
 
-        this.memory.updateAgentContext(this.role, {
-            currently_working_on: 'idle',
-            next_tasks: []
-        });
+        const response = await this.llm.generateText([{ role: 'user', content: prompt }]);
+        // Extract code block if present
+        const testCode = this.extractCodeBlock(response) || response;
 
-        this.eventBus.emit(EventType.UNIT_TESTS_PASSING, this.role, {
-            summary: 'All checks passed.'
-        });
+        console.log('[QA Engineer] Test Code Generated. Preparing Sandbox...');
+
+        // 2. Prepare Sandbox Context
+        const tempDir = path.join(process.cwd(), 'temp_execution', `qa_${Date.now()}`);
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
+
+        // Write test file
+        fs.writeFileSync(path.join(tempDir, 'test_runner.js'), testCode);
+
+        // 3. Execute in Sandbox
+        const sandbox = ExecutionSandbox.getInstance();
+        console.log(`[QA Engineer] Running in Sandbox (node:18-alpine)...`);
+
+        const result = await sandbox.runScript(
+            'node:18-alpine',
+            `node /app/test_runner.js`,
+            tempDir
+        );
+
+        console.log(`[QA Engineer] Sandbox Execution Complete.`);
+        console.log(`[Sandbox Output] ${result.stdout}`);
+
+        // Cleanup
+        fs.rmSync(tempDir, { recursive: true, force: true });
+
+        // 4. Update Memory & Notify
+        if (result.exitCode === 0) {
+            this.memory.updateDocument('test_coverage', {
+                unit_tests: 'PASSED',
+                report: result.stdout
+            });
+
+            this.memory.updateAgentContext(this.role, {
+                currently_working_on: 'idle',
+                next_tasks: []
+            });
+
+            this.eventBus.emit(EventType.UNIT_TESTS_PASSING, this.role, {
+                summary: 'Sandbox tests passed.',
+                details: result.stdout
+            });
+        } else {
+            this.emitFailure('test_run', `Sandbox tests failed. Exit: ${result.exitCode}, Error: ${result.stderr}`);
+        }
     }
 }

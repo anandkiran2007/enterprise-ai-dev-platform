@@ -24,6 +24,7 @@ export interface AgentContextPointer {
 
 export interface ProjectMemoryState {
     project_id: string;
+    owner_id?: string; // Optional for backward compatibility, required for new projects
     project_name?: string;
     current_phase: 'ideation' | 'requirements' | 'design' | 'development' | 'testing' | 'deployment';
 
@@ -144,9 +145,9 @@ export class ProjectMemory {
         await this.storage.save(this.state);
     }
 
-    public async load(projectId?: string) {
+    public async load(projectId?: string, userId?: string) {
         const idToLoad = projectId || this.state.project_id;
-        const loadedState = await this.storage.load(idToLoad);
+        const loadedState = await this.storage.load(idToLoad, userId);
         if (loadedState) {
             this.state = loadedState;
             console.log(`[Memory] State loaded for project: ${idToLoad}`);
@@ -155,5 +156,10 @@ export class ProjectMemory {
             // For now, let's assume we only switch to existing projects from the list.
             console.warn(`[Memory] No state found for project: ${projectId}`);
         }
+    }
+
+    public setOwner(userId: string) {
+        this.state.owner_id = userId;
+        this.touch();
     }
 }

@@ -10,14 +10,22 @@ interface Project {
     last_updated: string;
 }
 
+import { UserButton, useAuth } from "@clerk/nextjs";
+
 export default function ProjectsPage() {
+    const { userId } = useAuth();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch('http://localhost:3000/api/projects')
+        const uid = userId || undefined;
+        const headers: Record<string, string> = {};
+        if (uid) headers['x-user-id'] = uid;
+
+        fetch('http://localhost:3000/api/projects', { headers })
             .then(res => res.json())
             .then(data => {
+                if (!Array.isArray(data)) throw new Error("Invalid response");
                 const sorted = data.sort((a: Project, b: Project) =>
                     new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime()
                 );
@@ -28,14 +36,18 @@ export default function ProjectsPage() {
                 console.error("Failed to load projects", err);
                 setLoading(false);
             });
-    }, []);
+    }, [userId]);
 
     const handleProjectClick = async (e: React.MouseEvent, projectId: string) => {
         e.preventDefault();
+        const uid = userId || undefined;
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (uid) headers['x-user-id'] = uid;
+
         try {
             await fetch('http://localhost:3000/api/project/load', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers,
                 body: JSON.stringify({ projectId })
             });
             window.location.href = '/'; // Navigate to dashboard
@@ -54,9 +66,14 @@ export default function ProjectsPage() {
                         </h1>
                         <p className="text-gray-400 mt-2">Manage your AI-powered development workspaces</p>
                     </div>
-                    <button className="bg-white text-black hover:bg-gray-200 px-4 py-2 rounded-md font-medium flex items-center">
-                        <span className="mr-2">+</span> New Project
-                    </button>
+
+
+                    <div className="flex items-center gap-4">
+                        <Link href="/" className="bg-white text-black hover:bg-gray-200 px-4 py-2 rounded-md font-medium flex items-center">
+                            <span className="mr-2">+</span> New Project
+                        </Link>
+                        <UserButton afterSignOutUrl="/" />
+                    </div>
                 </header>
 
                 {loading ? (
