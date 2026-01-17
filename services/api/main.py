@@ -10,7 +10,7 @@ import os
 from contextlib import asynccontextmanager
 
 from services.api.database import init_db
-from services.api.routers import auth, organizations, projects, repositories, features, agents
+from services.api.routers import auth, organizations, projects, repositories, features, agents, integration
 from services.api.config import settings
 
 
@@ -49,6 +49,7 @@ app.include_router(projects.router, prefix="/projects", tags=["projects"])
 app.include_router(repositories.router, prefix="/repositories", tags=["repositories"])
 app.include_router(features.router, prefix="/features", tags=["features"])
 app.include_router(agents.router, prefix="/agents", tags=["agents"])
+app.include_router(integration.router, prefix="/integration", tags=["coding-tool-integration"])
 
 
 @app.get("/")
