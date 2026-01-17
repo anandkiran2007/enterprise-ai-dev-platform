@@ -84,8 +84,19 @@ export class QAEngineerAgent extends BaseAgent {
         });
 
         const response = await this.llm.generateText([{ role: 'user', content: prompt }]);
-        // Extract code block if present
-        const testCode = this.extractCodeBlock(response) || response;
+
+        // Robust Code Extraction Logic
+        let testCode = response;
+        const codeBlockRegex = /```(?:javascript|js|typescript|ts)?\n([\s\S]*?)```/i;
+        const match = response.match(codeBlockRegex);
+
+        if (match && match[1]) {
+            testCode = match[1].trim();
+            console.log('[QA Engineer] Successfully extracted code block from LLM response.');
+        } else {
+            console.error('[QA Engineer] ❌ No valid code block found in LLM response.');
+            throw new Error('LLM Failed to generate valid code block. Response did not contain markdown code markers.');
+        }
 
         console.log('[QA Engineer] Test Code Generated. Preparing Sandbox...');
 

@@ -27,12 +27,33 @@ export class AgentCoordinator {
         for (let i = 0; i < iterations; i++) {
             console.log(`\n--- Iteration ${i + 1} ---`);
 
-            // Poll agents
+            // Poll agents - SEQUENTIAL EXECUTION ENFORCED
             for (const agent of this.agents) {
+                // Global Lock Check: Is anyone else working?
+                const snapshot = this.memory.getSnapshot();
+                const activeContexts = Object.values(snapshot.agent_context_pointers);
+                const isSystemBusy = activeContexts.some(ctx =>
+                    ctx.currently_working_on !== 'idle' &&
+                    ctx.currently_working_on !== '' &&
+                    ctx.currently_working_on !== 'Waiting for tasks...'
+                );
+
+                // If system is busy, ONLY the agent who is working can proceed
+                // (We allow the working agent to call act() again to finish their work)
+                const myContext = snapshot.agent_context_pointers[agent.role];
+                const amIWorking = myContext && myContext.currently_working_on !== 'idle' && myContext.currently_working_on !== '';
+
+                if (isSystemBusy && !amIWorking) {
+                    // console.log(`[Coordinator] Skipping ${agent.role} because system is busy.`);
+                    continue;
+                }
+
                 const didWork = await agent.act();
                 if (didWork) {
-                    // Give other agents a chance to react to events immediately if we wanted
-                    // For now, we just proceed to next agent
+                    // One agent did work, so we break the loop to let them finish 
+                    // and re-evaluate state in next iteration. 
+                    // This enforces "One Step at a Time".
+                    break;
                 }
             }
 

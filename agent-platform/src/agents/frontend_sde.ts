@@ -87,13 +87,11 @@ export class FrontendSDEAgent extends BaseAgent {
             { role: 'user', content: 'Generate a React component for the main view.' }
         ]);
 
-        this.memory.updateDocument('code_artifacts', {
-            frontend: {
-                structure_summary: 'React + TypeScript',
-                entry_points: ['src/App.tsx'],
-                repository_url: 'storage://frontend_repo/',
-                generated_code: componentCode
-            }
+        this.memory.updateCodeArtifact('frontend', {
+            structure_summary: 'React + TypeScript',
+            entry_points: ['src/App.tsx'],
+            repository_url: 'storage://frontend_repo/',
+            generated_code: componentCode
         });
 
         this.memory.updateAgentContext(this.role, {
@@ -102,7 +100,8 @@ export class FrontendSDEAgent extends BaseAgent {
         });
 
         this.eventBus.emit(EventType.FRONTEND_COMPONENT_READY, this.role, {
-            summary: 'Frontend components generated and linked to API.'
+            summary: 'Frontend components generated and linked to API.',
+            componentCode: componentCode
         });
     }
 }

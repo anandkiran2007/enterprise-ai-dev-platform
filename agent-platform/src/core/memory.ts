@@ -116,6 +116,14 @@ export class ProjectMemory {
         this.touch();
     }
 
+    updateCodeArtifact(artifactType: string, data: any) {
+        this.state.code_artifacts[artifactType] = {
+            ...this.state.code_artifacts[artifactType],
+            ...data
+        };
+        this.touch();
+    }
+
     updateAgentContext(agentRole: string, context: Partial<AgentContextPointer>) {
         if (!this.state.agent_context_pointers[agentRole]) {
             this.state.agent_context_pointers[agentRole] = {

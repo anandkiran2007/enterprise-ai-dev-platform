@@ -64,6 +64,12 @@ ROLE:
 CONSTRAINTS:
 - Tests must be realistic and verifiable.
 - Do NOT assume UI elements that aren't in the design.
+- **Do NOT use 'describe', 'it', or 'test' (Jest/Mocha).** Use standard Node.js 'assert' module or simple if/else checks.
+- The script must be self-contained and runnable with 'node script.js'.
+
+OUTPUT FORMAT:
+- You must output the test code inside a markdown code block (e.g. \`\`\`javascript).
+- Do not output conversational text outside the code block.
 `,
 
     devops: `
