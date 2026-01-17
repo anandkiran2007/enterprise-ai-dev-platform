@@ -27,9 +27,12 @@ async def get_repositories(
 ):
     """Get repositories for project"""
     try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
         repos = await repo_service.get_project_repositories(
             project_id=project_id,
-            user_id=current_user.id,
+            user_id=user_id,
             db=db
         )
         return repos
@@ -49,10 +52,13 @@ async def connect_repository(
 ):
     """Connect new repository to project"""
     try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
         repo = await repo_service.connect_repository(
             project_id=project_id,
             repo_data=repo_data,
-            user_id=current_user.id,
+            user_id=user_id,
             db=db
         )
         return repo
@@ -72,10 +78,13 @@ async def sync_repository(
 ):
     """Trigger repository sync"""
     try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
         await repo_service.sync_repository(
             repo_id=repo_id,
             sync_type=sync_request.sync_type,
-            user_id=current_user.id,
+            user_id=user_id,
             db=db
         )
         return {"message": "Sync started", "repository_id": repo_id}
@@ -94,9 +103,12 @@ async def get_discovery_report(
 ):
     """Get repository discovery report"""
     try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
         discovery = await repo_service.get_discovery_report(
             repo_id=repo_id,
-            user_id=current_user.id,
+            user_id=user_id,
             db=db
         )
         if not discovery:

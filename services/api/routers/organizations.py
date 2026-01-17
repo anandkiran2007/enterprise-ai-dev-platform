@@ -85,3 +85,68 @@ async def get_organization_members(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch members: {str(e)}"
         )
+
+
+@router.post("/{org_id}/members", response_model=OrganizationMemberResponse)
+async def invite_member(
+    org_id: str,
+    member_data: dict,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Invite member to organization"""
+    try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
+        # Check if user is admin or maintainer
+        if not await org_service.is_admin_or_maintainer(org_id, user_id, db):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions"
+            )
+        
+        member = await org_service.invite_member(
+            org_id=org_id,
+            email=member_data.get("email"),
+            role=member_data.get("role", "member"),
+            db=db
+        )
+        return member
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to invite member: {str(e)}"
+        )
+
+
+@router.delete("/{org_id}/members/{member_id}")
+async def remove_member(
+    org_id: str,
+    member_id: str,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user)
+):
+    """Remove member from organization"""
+    try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
+        # Check if user is admin or maintainer
+        if not await org_service.is_admin_or_maintainer(org_id, user_id, db):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions"
+            )
+        
+        await org_service.remove_member(org_id, member_id, db)
+        return {"message": "Member removed successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to remove member: {str(e)}"
+        )
