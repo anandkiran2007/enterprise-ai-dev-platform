@@ -130,6 +130,7 @@ temp/
 
 # Secrets
 secrets/
+.agent_secrets.json
 *.key
 *.pem
 *.crt

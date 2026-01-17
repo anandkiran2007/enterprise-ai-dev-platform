@@ -1,0 +1,189 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentForge Dashboard</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --border-color: #30363d;
+            --accent-color: #58a6ff;
+            --success-color: #238636;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        h1 {
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .card h3 {
+            margin-top: 0;
+            color: var(--accent-color);
+        }
+
+        pre {
+            background: #0d1117;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            background: var(--border-color);
+        }
+        
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+
+        .agent-card {
+            background: rgba(255,255,255,0.05);
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .event-item {
+            border-bottom: 1px solid var(--border-color);
+            padding: 8px 0;
+            font-size: 13px;
+        }
+        
+        .event-time {
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 AgentForge Operation Center</h1>
+
+    <div class="container">
+        <!-- Left Column: State -->
+        <div class="main-column">
+            <div class="card">
+                <h3>Project Phase: <span id="project-phase">Loading...</span></h3>
+                <div id="living-docs"></div>
+            </div>
+
+            <div class="card">
+                <h3>Active Agents</h3>
+                <div id="agents-list" class="agent-grid"></div>
+            </div>
+
+            <div class="card">
+                <h3>Code Artifacts</h3>
+                <pre id="code-artifacts">{}</pre>
+            </div>
+        </div>
+
+        <!-- Right Column: Events -->
+        <div class="side-column">
+            <div class="card">
+                <h3>Live Event Stream</h3>
+                <div id="event-feed"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function updateDashboard() {
+            try {
+                // Fetch State
+                const memoryRes = await fetch('/api/memory');
+                const memory = await memoryRes.json();
+                
+                // Update Phase
+                document.getElementById('project-phase').innerText = memory.current_phase.toUpperCase();
+                
+                // Update Agents
+                const agentsList = document.getElementById('agents-list');
+                agentsList.innerHTML = '';
+                
+                for (const [role, context] of Object.entries(memory.agent_context_pointers)) {
+                    const div = document.createElement('div');
+                    div.className = 'agent-card';
+                    div.innerHTML = `
+                        <strong>${role}</strong><br>
+                        <small>Status: ${context.currently_working_on || 'idle'}</small>
+                    `;
+                    agentsList.appendChild(div);
+                }
+
+                // Update Living Docs
+                const docsDiv = document.getElementById('living-docs');
+                docsDiv.innerHTML = '';
+                for (const [key, doc] of Object.entries(memory.living_documents)) {
+                    if (doc) {
+                        docsDiv.innerHTML += `<div><strong>${key}:</strong> ${doc.summary || 'Exists'}</div>`;
+                    }
+                }
+
+                // Update Code Artifacts
+                document.getElementById('code-artifacts').innerText = JSON.stringify(memory.code_artifacts, null, 2);
+
+                // Fetch Events
+                const eventsRes = await fetch('/api/events');
+                const events = await eventsRes.json();
+                
+                const feed = document.getElementById('event-feed');
+                feed.innerHTML = '';
+                events.forEach(event => {
+                    const div = document.createElement('div');
+                    div.className = 'event-item';
+                    div.innerHTML = `
+                        <div class="event-time">${new Date(event.timestamp).toLocaleTimeString()}</div>
+                        <strong>${event.type}</strong>
+                        <div>${event.emitted_by}</div>
+                    `;
+                    feed.appendChild(div);
+                });
+
+            } catch (e) {
+                console.error("Dashboard poll failed", e);
+            }
+        }
+
+        // Poll every 1 second
+        setInterval(updateDashboard, 1000);
+        updateDashboard();
+    </script>
+</body>
+</html>
