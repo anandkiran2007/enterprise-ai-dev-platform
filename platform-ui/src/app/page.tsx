@@ -161,9 +161,10 @@ export default function Dashboard() {
 
               <div className="flex-1 overflow-y-auto p-6 bg-gray-950 font-mono text-sm text-gray-300">
                 <pre className="whitespace-pre-wrap leading-relaxed">
-                  {typeof selectedDoc.content === 'object'
-                    ? JSON.stringify(selectedDoc.content, null, 2)
-                    : selectedDoc.content || 'No content available.'}
+                  {(() => {
+                    const { title, ...content } = selectedDoc;
+                    return JSON.stringify(content, null, 2);
+                  })()}
                 </pre>
               </div>
 

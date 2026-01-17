@@ -21,7 +21,35 @@ async function main() {
     console.log('--- Initializing Enterprise AI Dev Platform ---');
 
     // 1. Setup Infrastructure
-    const projectId = uuidv4();
+    // 1. Setup Infrastructure
+    let projectId: string;
+
+    // Auto-Resume Logic: Find most recent project file
+    const fs = require('fs');
+    const path = require('path');
+    const persistenceDir = path.join(process.cwd(), 'persistence');
+
+    let latestFile: string | null = null;
+    let latestTime = 0;
+
+    if (fs.existsSync(persistenceDir)) {
+        const files = fs.readdirSync(persistenceDir).filter((f: string) => f.endsWith('.json') && f !== 'memory.json');
+        files.forEach((f: string) => {
+            const stats = fs.statSync(path.join(persistenceDir, f));
+            if (stats.mtimeMs > latestTime) {
+                latestTime = stats.mtimeMs;
+                latestFile = f;
+            }
+        });
+    }
+
+    if (latestFile) {
+        projectId = (latestFile as string).replace('.json', '');
+        console.log(`[System] Auto-Resuming Project: ${projectId} (Last Modified: ${new Date(latestTime).toLocaleString()}) 🔄`);
+    } else {
+        projectId = uuidv4();
+        console.log(`[System] Creating New Project: ${projectId} ✨`);
+    }
 
     // Storage Adapter Selection
     let storageAdapter;
