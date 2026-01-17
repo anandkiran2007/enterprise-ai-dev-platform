@@ -23,9 +23,13 @@ export class OrganizationsService {
   async getOrganizations(filters?: SearchFilters, pagination?: PaginationParams): Promise<PaginatedResponse<Organization>> {
     try {
       const params = { ...filters, ...pagination }
-      const response = await apiClient.get<PaginatedResponse<Organization>>('/organizations', params)
+      const response = await apiClient.get<PaginatedResponse<Organization>>('/api/organizations', params)
       return response.data
     } catch (error) {
+      // Re-throw network errors to be handled by caller
+      if (error instanceof ApiError && (error.code === 'NETWORK_ERROR' || error.status === 0 || error.status === 404)) {
+        throw error
+      }
       throw this.handleError(error, 'Failed to fetch organizations')
     }
   }
@@ -33,7 +37,7 @@ export class OrganizationsService {
   // Get single organization by ID
   async getOrganization(id: string): Promise<Organization> {
     try {
-      const response = await apiClient.get<Organization>(`/organizations/${id}`)
+      const response = await apiClient.get<Organization>(`/api/organizations/${id}`)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch organization')
@@ -43,7 +47,7 @@ export class OrganizationsService {
   // Create new organization
   async createOrganization(data: CreateOrganizationRequest): Promise<Organization> {
     try {
-      const response = await apiClient.post<Organization>('/organizations', data)
+      const response = await apiClient.post<Organization>('/api/organizations', data)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to create organization')
@@ -53,7 +57,7 @@ export class OrganizationsService {
   // Update organization
   async updateOrganization(id: string, data: Partial<Organization>): Promise<Organization> {
     try {
-      const response = await apiClient.put<Organization>(`/organizations/${id}`, data)
+      const response = await apiClient.put<Organization>(`/api/organizations/${id}`, data)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to update organization')
@@ -63,7 +67,7 @@ export class OrganizationsService {
   // Delete organization
   async deleteOrganization(id: string): Promise<void> {
     try {
-      await apiClient.delete(`/organizations/${id}`)
+      await apiClient.delete(`/api/organizations/${id}`)
     } catch (error) {
       throw this.handleError(error, 'Failed to delete organization')
     }
@@ -74,7 +78,7 @@ export class OrganizationsService {
     try {
       const params = pagination || {}
       const response = await apiClient.get<PaginatedResponse<OrganizationMember>>(
-        `/organizations/${organizationId}/members`, 
+        `/api/organizations/${organizationId}/members`, 
         params
       )
       return response.data
@@ -87,7 +91,7 @@ export class OrganizationsService {
   async inviteMember(organizationId: string, data: InviteMemberRequest): Promise<OrganizationMember> {
     try {
       const response = await apiClient.post<OrganizationMember>(
-        `/organizations/${organizationId}/members`, 
+        `/api/organizations/${organizationId}/members`, 
         data
       )
       return response.data
@@ -99,7 +103,7 @@ export class OrganizationsService {
   // Remove member from organization
   async removeMember(organizationId: string, memberId: string): Promise<void> {
     try {
-      await apiClient.delete(`/organizations/${organizationId}/members/${memberId}`)
+      await apiClient.delete(`/api/organizations/${organizationId}/members/${memberId}`)
     } catch (error) {
       throw this.handleError(error, 'Failed to remove member')
     }
@@ -113,7 +117,7 @@ export class OrganizationsService {
   ): Promise<OrganizationMember> {
     try {
       const response = await apiClient.patch<OrganizationMember>(
-        `/organizations/${organizationId}/members/${memberId}`, 
+        `/api/organizations/${organizationId}/members/${memberId}`, 
         { role }
       )
       return response.data
@@ -126,7 +130,7 @@ export class OrganizationsService {
   async isMember(organizationId: string): Promise<boolean> {
     try {
       const response = await apiClient.get<{ is_member: boolean }>(
-        `/organizations/${organizationId}/membership`
+        `/api/organizations/${organizationId}/membership`
       )
       return response.data.is_member
     } catch (error) {
@@ -138,7 +142,7 @@ export class OrganizationsService {
   async hasAdminPermissions(organizationId: string): Promise<boolean> {
     try {
       const response = await apiClient.get<{ has_permissions: boolean }>(
-        `/organizations/${organizationId}/permissions`
+        `/api/organizations/${organizationId}/permissions`
       )
       return response.data.has_permissions
     } catch (error) {
@@ -154,7 +158,7 @@ export class OrganizationsService {
     active_agents: number
   }> {
     try {
-      const response = await apiClient.get(`/organizations/${organizationId}/stats`)
+      const response = await apiClient.get(`/api/organizations/${organizationId}/stats`)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch organization statistics')
@@ -164,7 +168,7 @@ export class OrganizationsService {
   // Search organizations
   async searchOrganizations(query: string): Promise<Organization[]> {
     try {
-      const response = await apiClient.get<Organization[]>('/organizations/search', { query })
+      const response = await apiClient.get<Organization[]>('/api/organizations/search', { query })
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to search organizations')
@@ -175,7 +179,7 @@ export class OrganizationsService {
   async transferOwnership(organizationId: string, newOwnerId: string): Promise<Organization> {
     try {
       const response = await apiClient.post<Organization>(
-        `/organizations/${organizationId}/transfer-ownership`,
+        `/api/organizations/${organizationId}/transfer-ownership`,
         { new_owner_id: newOwnerId }
       )
       return response.data
@@ -187,7 +191,7 @@ export class OrganizationsService {
   // Leave organization
   async leaveOrganization(organizationId: string): Promise<void> {
     try {
-      await apiClient.post(`/organizations/${organizationId}/leave`)
+      await apiClient.post(`/api/organizations/${organizationId}/leave`)
     } catch (error) {
       throw this.handleError(error, 'Failed to leave organization')
     }

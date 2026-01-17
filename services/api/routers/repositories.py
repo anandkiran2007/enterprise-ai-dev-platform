@@ -2,8 +2,8 @@
 Repository management routes
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import List, Optional
 
 from services.api.schemas.repositories import (
     RepositoryCreate,
@@ -21,20 +21,30 @@ repo_service = RepositoryService()
 
 @router.get("/", response_model=List[RepositoryResponse])
 async def get_repositories(
-    project_id: str,
+    project_id: Optional[str] = Query(None, description="Filter by project ID"),
+    organization_id: Optional[str] = Query(None, description="Filter by organization ID"),
     db=Depends(get_db),
     current_user=Depends(get_current_user)
 ):
-    """Get repositories for project"""
+    """Get repositories - optionally filtered by project or organization"""
     try:
         user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
         if not user_id:
             raise Exception("Invalid user context")
-        repos = await repo_service.get_project_repositories(
-            project_id=project_id,
-            user_id=user_id,
-            db=db
-        )
+        
+        if project_id:
+            repos = await repo_service.get_project_repositories(
+                project_id=project_id,
+                user_id=user_id,
+                db=db
+            )
+        else:
+            # Get all repositories for user (across all projects)
+            repos = await repo_service.get_user_repositories(
+                user_id=user_id,
+                organization_id=organization_id,
+                db=db
+            )
         return repos
     except Exception as e:
         raise HTTPException(

@@ -22,9 +22,13 @@ export class RepositoriesService {
   async getRepositories(filters?: SearchFilters, pagination?: PaginationParams): Promise<PaginatedResponse<Repository>> {
     try {
       const params = { ...filters, ...pagination }
-      const response = await apiClient.get<PaginatedResponse<Repository>>('/repositories', params)
+      const response = await apiClient.get<PaginatedResponse<Repository>>('/api/repositories', params)
       return response.data
     } catch (error) {
+      // Re-throw network errors to be handled by caller
+      if (error instanceof ApiError && (error.code === 'NETWORK_ERROR' || error.status === 0 || error.status === 404)) {
+        throw error
+      }
       throw this.handleError(error, 'Failed to fetch repositories')
     }
   }
@@ -32,7 +36,7 @@ export class RepositoriesService {
   // Get single repository
   async getRepository(id: string): Promise<Repository> {
     try {
-      const response = await apiClient.get<Repository>(`/repositories/${id}`)
+      const response = await apiClient.get<Repository>(`/api/repositories/${id}`)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch repository')
@@ -42,7 +46,7 @@ export class RepositoriesService {
   // Create new repository
   async createRepository(data: CreateRepositoryRequest): Promise<Repository> {
     try {
-      const response = await apiClient.post<Repository>('/repositories', data)
+      const response = await apiClient.post<Repository>('/api/repositories', data)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to create repository')
@@ -52,7 +56,7 @@ export class RepositoriesService {
   // Update repository
   async updateRepository(id: string, data: Partial<Repository>): Promise<Repository> {
     try {
-      const response = await apiClient.put<Repository>(`/repositories/${id}`, data)
+      const response = await apiClient.put<Repository>(`/api/repositories/${id}`, data)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to update repository')
@@ -62,7 +66,7 @@ export class RepositoriesService {
   // Delete repository
   async deleteRepository(id: string): Promise<void> {
     try {
-      await apiClient.delete(`/repositories/${id}`)
+      await apiClient.delete(`/api/repositories/${id}`)
     } catch (error) {
       throw this.handleError(error, 'Failed to delete repository')
     }
@@ -71,7 +75,7 @@ export class RepositoriesService {
   // Sync repository
   async syncRepository(id: string): Promise<Repository> {
     try {
-      const response = await apiClient.post<Repository>(`/repositories/${id}/sync`)
+      const response = await apiClient.post<Repository>(`/api/repositories/${id}/sync`)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to sync repository')
@@ -85,7 +89,7 @@ export class RepositoriesService {
     error_message?: string
   }> {
     try {
-      const response = await apiClient.get(`/repositories/${id}/sync-status`)
+      const response = await apiClient.get(`/api/repositories/${id}/sync-status`)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to get sync status')
@@ -95,7 +99,7 @@ export class RepositoriesService {
   // Start discovery analysis
   async startDiscovery(id: string): Promise<DiscoveryReport> {
     try {
-      const response = await apiClient.post<DiscoveryReport>(`/repositories/${id}/discovery`)
+      const response = await apiClient.post<DiscoveryReport>(`/api/repositories/${id}/discovery`)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to start discovery')
@@ -105,7 +109,7 @@ export class RepositoriesService {
   // Get discovery report
   async getDiscoveryReport(id: string): Promise<DiscoveryReport> {
     try {
-      const response = await apiClient.get<DiscoveryReport>(`/repositories/${id}/discovery`)
+      const response = await apiClient.get<DiscoveryReport>(`/api/repositories/${id}/discovery`)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to get discovery report')
@@ -120,7 +124,7 @@ export class RepositoriesService {
     completed_at?: string
   }> {
     try {
-      const response = await apiClient.get(`/repositories/${id}/discovery-status`)
+      const response = await apiClient.get(`/api/repositories/${id}/discovery-status`)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to get discovery status')
@@ -130,7 +134,7 @@ export class RepositoriesService {
   // Get repository branches
   async getBranches(id: string): Promise<string[]> {
     try {
-      const response = await apiClient.get<string[]>(`/repositories/${id}/branches`)
+      const response = await apiClient.get<string[]>(`/api/repositories/${id}/branches`)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch branches')
@@ -140,7 +144,7 @@ export class RepositoriesService {
   // Change default branch
   async changeBranch(id: string, branch: string): Promise<Repository> {
     try {
-      const response = await apiClient.patch<Repository>(`/repositories/${id}/branch`, { branch })
+      const response = await apiClient.patch<Repository>(`/api/repositories/${id}/branch`, { branch })
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to change branch')
@@ -157,7 +161,7 @@ export class RepositoriesService {
     file_count: number
   }> {
     try {
-      const response = await apiClient.get(`/repositories/${id}/stats`)
+      const response = await apiClient.get(`/api/repositories/${id}/stats`)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch repository statistics')
@@ -167,7 +171,7 @@ export class RepositoriesService {
   // Search repositories
   async searchRepositories(query: string): Promise<Repository[]> {
     try {
-      const response = await apiClient.get<Repository[]>('/repositories/search', { query })
+      const response = await apiClient.get<Repository[]>('/api/repositories/search', { query })
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to search repositories')
@@ -180,7 +184,7 @@ export class RepositoriesService {
     failed: Array<{ id: string; error: string }>
   }> {
     try {
-      const response = await apiClient.post('/repositories/bulk-sync', { repository_ids: repositoryIds })
+      const response = await apiClient.post('/api/repositories/bulk-sync', { repository_ids: repositoryIds })
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to bulk sync repositories')
@@ -197,7 +201,7 @@ export class RepositoriesService {
   }>> {
     try {
       const params = pagination || {}
-      const response = await apiClient.get<PaginatedResponse<any>>(`/repositories/${id}/activity`, params)
+      const response = await apiClient.get<PaginatedResponse<any>>(`/api/repositories/${id}/activity`, params)
       return response.data
     } catch (error) {
       throw this.handleError(error, 'Failed to fetch repository activity')

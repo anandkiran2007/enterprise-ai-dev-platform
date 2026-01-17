@@ -1,178 +1,142 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import { useAuth } from '../contexts/AuthContext'
-
-type Organization = {
-  id: string
-  name: string
-  slug: string
-  created_at: string
-  member_count?: number
-}
-
-type Project = {
-  id: string
-  name: string
-  description?: string | null
-  status: string
-  repository_count?: number | null
-  last_activity?: string | null
-  created_at: string
-}
+import { organizationsService } from '../services/organizations.service'
+import { projectsService } from '../services/projects.service'
+import { useApi, useMutation } from '../hooks/useApi'
+import { useToast } from '../contexts/ToastContext'
+import { Modal } from '../components/ui/Modal'
+import { LoadingSpinner } from '../components/ui/LoadingSpinner'
+import { EmptyState } from '../components/ui/EmptyState'
+import { Skeleton } from '../components/ui/Skeleton'
+import { FormField } from '../components/ui/FormField'
+import {
+  FolderIcon,
+  PlusIcon,
+  ArrowPathIcon,
+  ExclamationTriangleIcon,
+  CheckCircleIcon,
+  ClockIcon
+} from '@heroicons/react/24/outline'
+import { formatDistanceToNow } from 'date-fns'
+import Link from 'next/link'
 
 export default function ProjectsPage() {
   const { state } = useAuth()
-
-  const [orgs, setOrgs] = useState<Organization[]>([])
+  const { showSuccess, showError } = useToast()
   const [selectedOrgId, setSelectedOrgId] = useState<string>('')
-  const [projects, setProjects] = useState<Project[]>([])
+  const [showCreateOrgModal, setShowCreateOrgModal] = useState(false)
+  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false)
 
-  const [loadingOrgs, setLoadingOrgs] = useState(false)
-  const [loadingProjects, setLoadingProjects] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
+  // Form state
   const [newOrgName, setNewOrgName] = useState('')
   const [newOrgSlug, setNewOrgSlug] = useState('')
-
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectDescription, setNewProjectDescription] = useState('')
 
-  const authHeader = useMemo(() => {
-    const token = state.token || (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null)
-    const headers: Record<string, string> = {}
-    if (token) {
-      headers.Authorization = `Bearer ${token}`
-    }
-    return headers
-  }, [state.token])
+  // Fetch organizations
+  const {
+    data: orgsData,
+    loading: loadingOrgs,
+    refetch: refetchOrgs
+  } = useApi(() => organizationsService.getOrganizations(), { immediate: true })
 
-  const loadOrganizations = async () => {
-    setLoadingOrgs(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/organizations', {
-        headers: {
-          ...authHeader,
-        },
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `Failed to load organizations (${res.status})`)
-      }
-      const data = (await res.json()) as Organization[]
-      setOrgs(data)
-      if (!selectedOrgId && data.length > 0) {
-        setSelectedOrgId(data[0].id)
-      }
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load organizations')
-    } finally {
-      setLoadingOrgs(false)
-    }
-  }
+  // Fetch projects
+  const {
+    data: projectsData,
+    loading: loadingProjects,
+    refetch: refetchProjects
+  } = useApi(
+    () => selectedOrgId
+      ? projectsService.getProjects(selectedOrgId)
+      : Promise.resolve({ data: [], total: 0, page: 1, limit: 20, hasMore: false }),
+    { immediate: !!selectedOrgId }
+  )
 
-  const loadProjects = async (orgId: string) => {
-    if (!orgId) {
-      setProjects([])
-      return
-    }
-    setLoadingProjects(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/projects?org_id=${encodeURIComponent(orgId)}`, {
-        headers: {
-          ...authHeader,
-        },
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `Failed to load projects (${res.status})`)
+  // Create organization mutation
+  const { mutate: createOrganization, loading: creatingOrg } = useMutation(
+    (data: { name: string; slug?: string }) => organizationsService.createOrganization(data),
+    {
+      onSuccess: (org) => {
+        showSuccess('Organization created successfully')
+        setShowCreateOrgModal(false)
+        setNewOrgName('')
+        setNewOrgSlug('')
+        setSelectedOrgId(org.id)
+        refetchOrgs()
+      },
+      onError: (error) => {
+        showError(error.message || 'Failed to create organization')
       }
-      const data = (await res.json()) as Project[]
-      setProjects(data)
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load projects')
-    } finally {
-      setLoadingProjects(false)
     }
-  }
+  )
+
+  // Create project mutation
+  const { mutate: createProject, loading: creatingProject } = useMutation(
+    (data: { name: string; description?: string }) => {
+      if (!selectedOrgId) throw new Error('Please select an organization first')
+      return projectsService.createProject(selectedOrgId, data)
+    },
+    {
+      onSuccess: () => {
+        showSuccess('Project created successfully')
+        setShowCreateProjectModal(false)
+        setNewProjectName('')
+        setNewProjectDescription('')
+        refetchProjects()
+      },
+      onError: (error) => {
+        showError(error.message || 'Failed to create project')
+      }
+    }
+  )
+
+  const organizations = orgsData?.data || []
+  const projects = projectsData?.data || []
 
   useEffect(() => {
-    loadOrganizations()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    if (organizations.length > 0 && !selectedOrgId) {
+      setSelectedOrgId(organizations[0].id)
+    }
+  }, [organizations, selectedOrgId])
 
-  useEffect(() => {
-    loadProjects(selectedOrgId)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedOrgId])
-
-  const createOrganization = async () => {
-    if (!newOrgName.trim() || !newOrgSlug.trim()) {
-      setError('Organization name and slug are required')
+  const handleCreateOrg = () => {
+    if (!newOrgName.trim()) {
+      showError('Organization name is required')
       return
     }
-    setSubmitting(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/organizations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeader,
-        },
-        body: JSON.stringify({ name: newOrgName.trim(), slug: newOrgSlug.trim() }),
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `Failed to create organization (${res.status})`)
-      }
-      const created = (await res.json()) as Organization
-      setOrgs((prev) => [created, ...prev])
-      setSelectedOrgId(created.id)
-      setNewOrgName('')
-      setNewOrgSlug('')
-    } catch (e: any) {
-      setError(e?.message || 'Failed to create organization')
-    } finally {
-      setSubmitting(false)
-    }
+    createOrganization({
+      name: newOrgName.trim(),
+      slug: newOrgSlug.trim() || undefined
+    })
   }
 
-  const createProject = async () => {
-    if (!selectedOrgId) {
-      setError('Select an organization first')
-      return
-    }
+  const handleCreateProject = () => {
     if (!newProjectName.trim()) {
-      setError('Project name is required')
+      showError('Project name is required')
       return
     }
-    setSubmitting(true)
-    setError(null)
-    try {
-      const res = await fetch(`/api/projects?org_id=${encodeURIComponent(selectedOrgId)}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeader,
-        },
-        body: JSON.stringify({ name: newProjectName.trim(), description: newProjectDescription.trim() || null }),
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `Failed to create project (${res.status})`)
-      }
-      const created = (await res.json()) as Project
-      setProjects((prev) => [created, ...prev])
-      setNewProjectName('')
-      setNewProjectDescription('')
-    } catch (e: any) {
-      setError(e?.message || 'Failed to create project')
-    } finally {
-      setSubmitting(false)
+    if (!selectedOrgId) {
+      showError('Please select an organization first')
+      return
     }
+    createProject({
+      name: newProjectName.trim(),
+      description: newProjectDescription.trim() || undefined
+    })
+  }
+
+  const getStatusBadge = (status: string) => {
+    const styles: Record<string, string> = {
+      active: 'badge-success',
+      archived: 'badge-gray',
+      deleted: 'badge-error'
+    }
+    return (
+      <span className={`badge ${styles[status] || 'badge-gray'}`}>
+        {status}
+      </span>
+    )
   }
 
   return (
@@ -185,164 +149,173 @@ export default function ProjectsPage() {
           </p>
         </div>
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
-        )}
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Sidebar */}
           <div className="lg:col-span-1 space-y-6">
-            <div className="card dark:bg-gray-800 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Organization</h2>
-                <button
-                  className="btn btn-secondary"
-                  onClick={loadOrganizations}
-                  disabled={loadingOrgs}
-                >
-                  {loadingOrgs ? 'Refreshing…' : 'Refresh'}
-                </button>
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Select</label>
-                <select
-                  className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                  value={selectedOrgId}
-                  onChange={(e) => setSelectedOrgId(e.target.value)}
-                  disabled={loadingOrgs || orgs.length === 0}
-                >
-                  {orgs.length === 0 ? (
-                    <option value="">No organizations yet</option>
-                  ) : (
-                    orgs.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name} ({o.slug})
-                      </option>
-                    ))
-                  )}
-                </select>
-              </div>
-
-              <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Create organization</h3>
-                <div className="mt-3 space-y-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
-                    <input
-                      className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                      value={newOrgName}
-                      onChange={(e) => setNewOrgName(e.target.value)}
-                      placeholder="Acme Inc"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Slug</label>
-                    <input
-                      className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                      value={newOrgSlug}
-                      onChange={(e) => setNewOrgSlug(e.target.value)}
-                      placeholder="acme"
-                    />
-                  </div>
+            {/* Organization Selector */}
+            <div className="card">
+              <div className="card-header">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">Organization</h2>
                   <button
-                    className="btn btn-primary w-full"
-                    onClick={createOrganization}
-                    disabled={submitting}
+                    className="btn btn-ghost btn-sm"
+                    onClick={refetchOrgs}
+                    disabled={loadingOrgs}
                   >
-                    {submitting ? 'Creating…' : 'Create org'}
+                    <ArrowPathIcon className={`h-4 w-4 ${loadingOrgs ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
               </div>
-            </div>
-
-            <div className="card dark:bg-gray-800 dark:border-gray-700">
-              <h2 className="text-lg font-medium text-gray-900 dark:text-white">New project</h2>
-              <div className="mt-4 space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
-                  <input
-                    className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                    value={newProjectName}
-                    onChange={(e) => setNewProjectName(e.target.value)}
-                    placeholder="Platform API"
-                    disabled={!selectedOrgId}
+              <div className="card-body">
+                {loadingOrgs ? (
+                  <Skeleton height={40} />
+                ) : organizations.length === 0 ? (
+                  <EmptyState
+                    icon={FolderIcon}
+                    title="No organizations"
+                    description="Create your first organization to get started"
+                    action={
+                      <button
+                        onClick={() => setShowCreateOrgModal(true)}
+                        className="btn btn-primary btn-sm"
+                      >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Create Organization
+                      </button>
+                    }
                   />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-                  <textarea
-                    className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                    value={newProjectDescription}
-                    onChange={(e) => setNewProjectDescription(e.target.value)}
-                    placeholder="Describe what this project is for…"
-                    disabled={!selectedOrgId}
-                  />
-                </div>
-                <button
-                  className="btn btn-primary w-full"
-                  onClick={createProject}
-                  disabled={submitting || !selectedOrgId}
-                >
-                  {submitting ? 'Creating…' : 'Create project'}
-                </button>
+                ) : (
+                  <>
+                    <select
+                      className="select w-full"
+                      value={selectedOrgId}
+                      onChange={(e) => setSelectedOrgId(e.target.value)}
+                    >
+                      {organizations.map((org) => (
+                        <option key={org.id} value={org.id}>
+                          {org.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setShowCreateOrgModal(true)}
+                      className="btn btn-secondary w-full mt-4"
+                    >
+                      <PlusIcon className="h-4 w-4 mr-2" />
+                      New Organization
+                    </button>
+                  </>
+                )}
               </div>
             </div>
+
+            {/* Create Project Card */}
+            {selectedOrgId && (
+              <div className="card">
+                <div className="card-header">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">New Project</h2>
+                </div>
+                <div className="card-body">
+                  <button
+                    onClick={() => setShowCreateProjectModal(true)}
+                    className="btn btn-primary w-full"
+                    disabled={!selectedOrgId}
+                  >
+                    <PlusIcon className="h-4 w-4 mr-2" />
+                    Create Project
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
+          {/* Main Content */}
           <div className="lg:col-span-2">
-            <div className="card dark:bg-gray-800 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-medium text-gray-900 dark:text-white">Projects</h2>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => loadProjects(selectedOrgId)}
-                  disabled={loadingProjects || !selectedOrgId}
-                >
-                  {loadingProjects ? 'Loading…' : 'Refresh'}
-                </button>
+            <div className="card">
+              <div className="card-header">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-medium text-gray-900 dark:text-white">
+                    Projects {selectedOrgId && `(${projects.length})`}
+                  </h2>
+                  {selectedOrgId && (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={refetchProjects}
+                      disabled={loadingProjects}
+                    >
+                      <ArrowPathIcon className={`h-4 w-4 ${loadingProjects ? 'animate-spin' : ''}`} />
+                    </button>
+                  )}
+                </div>
               </div>
-
-              <div className="mt-4">
+              <div className="card-body p-0">
                 {!selectedOrgId ? (
-                  <div className="text-sm text-gray-600 dark:text-gray-300">
-                    Create or select an organization to view projects.
-                  </div>
+                  <EmptyState
+                    icon={FolderIcon}
+                    title="Select an organization"
+                    description="Choose an organization to view its projects"
+                  />
                 ) : loadingProjects ? (
-                  <div className="text-sm text-gray-600 dark:text-gray-300">Loading projects…</div>
-                ) : projects.length === 0 ? (
-                  <div className="text-sm text-gray-600 dark:text-gray-300">
-                    No projects yet for this organization.
+                  <div className="p-6">
+                    {[...Array(3)].map((_, i) => (
+                      <Skeleton key={i} height={80} className="mb-4" />
+                    ))}
                   </div>
+                ) : projects.length === 0 ? (
+                  <EmptyState
+                    icon={FolderIcon}
+                    title="No projects yet"
+                    description="Create your first project for this organization"
+                    action={
+                      <button
+                        onClick={() => setShowCreateProjectModal(true)}
+                        className="btn btn-primary"
+                      >
+                        <PlusIcon className="h-4 w-4 mr-2" />
+                        Create Project
+                      </button>
+                    }
+                  />
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <table className="table">
                       <thead>
                         <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Repos</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                          <th className="table-header text-left">Name</th>
+                          <th className="table-header text-left">Status</th>
+                          <th className="table-header text-left">Repositories</th>
+                          <th className="table-header text-left">Last Activity</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {projects.map((p) => (
-                          <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-900">
-                            <td className="px-4 py-3">
-                              <div className="text-sm font-medium text-gray-900 dark:text-white">{p.name}</div>
-                              {p.description ? (
-                                <div className="text-xs text-gray-500 dark:text-gray-400">{p.description}</div>
-                              ) : null}
+                      <tbody>
+                        {projects.map((project) => (
+                          <tr key={project.id} className="table-row">
+                            <td className="table-cell">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {project.name}
+                                </div>
+                                {project.description && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    {project.description}
+                                  </div>
+                                )}
+                              </div>
                             </td>
-                            <td className="px-4 py-3">
-                              <span className="status-badge status-info">{p.status}</span>
+                            <td className="table-cell">
+                              {getStatusBadge(project.status)}
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                              {p.repository_count ?? 0}
+                            <td className="table-cell">
+                              <span className="text-sm text-gray-700 dark:text-gray-300">
+                                {project.repository_count ?? 0}
+                              </span>
                             </td>
-                            <td className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
-                              {new Date(p.created_at).toLocaleString()}
+                            <td className="table-cell">
+                              <span className="text-sm text-gray-600 dark:text-gray-400">
+                                {project.last_activity
+                                  ? formatDistanceToNow(new Date(project.last_activity), { addSuffix: true })
+                                  : 'Never'}
+                              </span>
                             </td>
                           </tr>
                         ))}
@@ -354,6 +327,119 @@ export default function ProjectsPage() {
             </div>
           </div>
         </div>
+
+        {/* Create Organization Modal */}
+        <Modal
+          isOpen={showCreateOrgModal}
+          onClose={() => setShowCreateOrgModal(false)}
+          title="Create Organization"
+          size="md"
+          footer={
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowCreateOrgModal(false)}
+                className="btn btn-secondary"
+                disabled={creatingOrg}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateOrg}
+                className="btn btn-primary"
+                disabled={creatingOrg || !newOrgName.trim()}
+              >
+                {creatingOrg ? (
+                  <>
+                    <LoadingSpinner size="sm" className="mr-2" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Organization'
+                )}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <FormField label="Organization Name" required>
+              <input
+                type="text"
+                value={newOrgName}
+                onChange={(e) => setNewOrgName(e.target.value)}
+                placeholder="Acme Inc"
+                className="input"
+                required
+              />
+            </FormField>
+            <FormField
+              label="Slug"
+              hint="URL-friendly identifier (auto-generated if left empty)"
+            >
+              <input
+                type="text"
+                value={newOrgSlug}
+                onChange={(e) => setNewOrgSlug(e.target.value)}
+                placeholder="acme-inc"
+                className="input"
+              />
+            </FormField>
+          </div>
+        </Modal>
+
+        {/* Create Project Modal */}
+        <Modal
+          isOpen={showCreateProjectModal}
+          onClose={() => setShowCreateProjectModal(false)}
+          title="Create Project"
+          size="md"
+          footer={
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowCreateProjectModal(false)}
+                className="btn btn-secondary"
+                disabled={creatingProject}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateProject}
+                className="btn btn-primary"
+                disabled={creatingProject || !newProjectName.trim() || !selectedOrgId}
+              >
+                {creatingProject ? (
+                  <>
+                    <LoadingSpinner size="sm" className="mr-2" />
+                    Creating...
+                  </>
+                ) : (
+                  'Create Project'
+                )}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <FormField label="Project Name" required>
+              <input
+                type="text"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="Platform API"
+                className="input"
+                required
+              />
+            </FormField>
+            <FormField label="Description" hint="Optional description of the project">
+              <textarea
+                value={newProjectDescription}
+                onChange={(e) => setNewProjectDescription(e.target.value)}
+                placeholder="Describe what this project is for..."
+                className="textarea"
+                rows={4}
+              />
+            </FormField>
+          </div>
+        </Modal>
       </div>
     </DashboardLayout>
   )

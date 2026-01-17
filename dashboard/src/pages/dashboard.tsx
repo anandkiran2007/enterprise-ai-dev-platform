@@ -11,30 +11,16 @@ import {
   ArrowTrendingDownIcon,
   UserGroupIcon,
   DocumentIcon,
-  EllipsisHorizontalIcon,
+  CpuChipIcon,
+  ArrowPathIcon
 } from '@heroicons/react/24/outline'
-
-interface Project {
-  id: string
-  name: string
-  description: string
-  status: 'active' | 'building' | 'failed' | 'completed'
-  repository: string
-  lastBuild: string
-  buildTime: number
-  coverage: number
-  team: string[]
-}
-
-type ActivityType = 'build' | 'deploy' | 'commit' | 'error'
-
-interface Activity {
-  id: string
-  type: ActivityType
-  message: string
-  timestamp: string
-  user: string
-}
+import { bffService } from '../services/bff.service'
+import { useToast } from '../contexts/ToastContext'
+import { LoadingSpinner } from '../components/ui/LoadingSpinner'
+import { Skeleton } from '../components/ui/Skeleton'
+import { EmptyState } from '../components/ui/EmptyState'
+import { formatDistanceToNow } from 'date-fns'
+import Link from 'next/link'
 
 type MetricTrend = 'up' | 'down' | 'neutral'
 type MetricColor = 'blue' | 'green' | 'yellow' | 'red' | 'purple'
@@ -55,175 +41,123 @@ interface Metric {
 
 export default function DashboardPage() {
   const { state } = useAuth()
-  const [projects, setProjects] = useState<Project[]>([])
+  const { showError } = useToast()
   const [metrics, setMetrics] = useState<Metric[]>([])
-  const [activities, setActivities] = useState<Activity[]>([])
+  const [activities, setActivities] = useState<any[]>([])
+  const [repositories, setRepositories] = useState<any[]>([])
+  const [organizations, setOrganizations] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    const loadData = async () => {
-      // Mock projects with full Project shape
-      const mockProjects: Project[] = [
+  const loadDashboardData = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const data = await bffService.getDashboardData()
+      
+      // Transform metrics
+      const transformedMetrics: Metric[] = [
         {
-          id: '1',
-          name: 'E-commerce Platform',
-          description: 'AI-powered e-commerce platform with React and Node.js',
-          status: 'active',
-          repository: 'github.com/company/ecommerce-platform',
-          lastBuild: '2024-01-16T22:00:00Z',
-          buildTime: 120,
-          coverage: 85,
-          team: ['Alice Chen', 'Bob Smith', 'Carol Davis'],
-        },
-        {
-          id: '2',
-          name: 'Mobile App API',
-          description: 'Backend API for mobile clients',
-          status: 'building',
-          repository: 'github.com/company/mobile-api',
-          lastBuild: '2024-01-16T21:30:00Z',
-          buildTime: 95,
-          coverage: 78,
-          team: ['John Doe', 'Eve Martinez'],
-        },
-        {
-          id: '3',
-          name: 'Data Analytics Dashboard',
-          description: 'Analytics dashboard for business metrics',
-          status: 'completed',
-          repository: 'github.com/company/analytics-dashboard',
-          lastBuild: '2024-01-15T18:00:00Z',
-          buildTime: 110,
-          coverage: 92,
-          team: ['Mike Johnson', 'Sarah Wilson'],
-        },
-        {
-          id: '4',
-          name: 'AI Content Generator',
-          description: 'AI-based content generation tool',
-          status: 'failed',
-          repository: 'github.com/company/ai-content',
-          lastBuild: '2024-01-16T20:10:00Z',
-          buildTime: 60,
-          coverage: 65,
-          team: ['Jane Smith', 'Tom Lee'],
-        },
-      ]
-
-      const mockMetrics: Metric[] = [
-        {
-          label: 'Active Projects',
-          title: 'Projects currently in progress',
-          value: 3,
+          label: 'Total Organizations',
+          title: 'Organizations you have access to',
+          value: data.stats.totalOrganizations,
           color: 'blue',
-          icon: FolderIcon,
-          change: { value: '+1 this week', trend: 'up' },
+          icon: UserGroupIcon,
+          change: { value: '+0', trend: 'neutral' }
         },
         {
-          label: 'Build Success Rate',
-          title: 'Successful builds in the last 24h',
-          value: '92%',
+          label: 'Total Projects',
+          title: 'Active projects across organizations',
+          value: data.stats.totalProjects,
           color: 'green',
-          icon: CheckCircleIcon,
-          change: { value: '+4%', trend: 'up' },
+          icon: FolderIcon,
+          change: { value: '+0', trend: 'neutral' }
         },
         {
-          label: 'Mean Build Time',
-          title: 'Average build duration',
-          value: '104s',
+          label: 'Total Repositories',
+          title: 'Repositories connected to the platform',
+          value: data.stats.totalRepositories,
+          color: 'purple',
+          icon: DocumentIcon,
+          change: { value: '+0', trend: 'neutral' }
+        },
+        {
+          label: 'Active Agents',
+          title: 'AI agents currently running',
+          value: data.stats.activeAgents,
           color: 'yellow',
-          icon: ClockIcon,
-          change: { value: '-8s', trend: 'down' },
-        },
-        {
-          label: 'Open Incidents',
-          title: 'Current build/ deploy incidents',
-          value: 2,
-          color: 'red',
-          icon: ExclamationTriangleIcon,
-          change: { value: '+1', trend: 'up' },
-        },
+          icon: CpuChipIcon,
+          change: { value: '+0', trend: 'neutral' }
+        }
       ]
 
-      const mockActivities: Activity[] = [
-        {
-          id: '1',
-          type: 'build',
-          message: 'Mobile App API build completed successfully',
-          timestamp: '5 minutes ago',
-          user: 'John Doe',
-        },
-        {
-          id: '2',
-          type: 'commit',
-          message: 'New features pushed to e-commerce-frontend',
-          timestamp: '1 hour ago',
-          user: 'Jane Smith',
-        },
-        {
-          id: '3',
-          type: 'deploy',
-          message: 'Analytics dashboard deployed to production',
-          timestamp: '2 hours ago',
-          user: 'Mike Johnson',
-        },
-        {
-          id: '4',
-          type: 'error',
-          message: 'AI Content Generator build failed',
-          timestamp: '3 hours ago',
-          user: 'Sarah Wilson',
-        },
-      ]
-
-      setProjects(mockProjects)
-      setMetrics(mockMetrics)
-      setActivities(mockActivities)
+      setMetrics(transformedMetrics)
+      setActivities(data.recentActivity)
+      setRepositories(data.repositories)
+      setOrganizations(data.organizations)
+    } catch (err: any) {
+      // Handle errors gracefully - API might not be running
+      const isNetworkError = err.code === 'NETWORK_ERROR' || 
+                            err.status === 0 || 
+                            err.message?.includes('connect') ||
+                            err.message?.includes('Network') ||
+                            err.message?.includes('fetch')
+      
+      if (isNetworkError) {
+        // API not running - show empty dashboard with zero values
+        const emptyMetrics: Metric[] = [
+          {
+            label: 'Total Organizations',
+            title: 'Organizations you have access to',
+            value: 0,
+            color: 'blue',
+            icon: UserGroupIcon,
+            change: { value: '+0', trend: 'neutral' }
+          },
+          {
+            label: 'Total Projects',
+            title: 'Active projects across organizations',
+            value: 0,
+            color: 'green',
+            icon: FolderIcon,
+            change: { value: '+0', trend: 'neutral' }
+          },
+          {
+            label: 'Total Repositories',
+            title: 'Repositories connected to the platform',
+            value: 0,
+            color: 'purple',
+            icon: DocumentIcon,
+            change: { value: '+0', trend: 'neutral' }
+          },
+          {
+            label: 'Active Agents',
+            title: 'AI agents currently running',
+            value: 0,
+            color: 'yellow',
+            icon: CpuChipIcon,
+            change: { value: '+0', trend: 'neutral' }
+          }
+        ]
+        setMetrics(emptyMetrics)
+        setActivities([])
+        setRepositories([])
+        setOrganizations([])
+        // Don't show error toast for network errors - this is expected when API is not running
+      } else {
+        // Real error - show it
+        const errorMessage = err.message || 'Failed to load dashboard data'
+        setError(errorMessage)
+        showError(errorMessage)
+      }
+    } finally {
       setIsLoading(false)
     }
+  }
 
-    loadData()
+  useEffect(() => {
+    loadDashboardData()
   }, [])
-
-  const getStatusIcon = (status: Project['status']) => {
-    switch (status) {
-      case 'active':
-        return <CheckCircleIcon className="h-5 w-5 text-green-500" />
-      case 'building':
-        return <ClockIcon className="h-5 w-5 text-yellow-500" />
-      case 'failed':
-        return <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />
-      case 'completed':
-        return <CheckCircleIcon className="h-5 w-5 text-blue-500" />
-      default:
-        return <ClockIcon className="h-5 w-5 text-gray-500" />
-    }
-  }
-
-  const getStatusBadge = (status: Project['status']) => {
-    const styles: Record<Project['status'], string> = {
-      active: 'badge-success',
-      building: 'badge-warning',
-      failed: 'badge-error',
-      completed: 'badge-primary',
-    }
-    return <span className={`badge ${styles[status]}`}>{status}</span>
-  }
-
-  const getActivityIcon = (type: ActivityType) => {
-    switch (type) {
-      case 'build':
-        return <ChartBarIcon className="h-4 w-4 text-blue-500" />
-      case 'deploy':
-        return <ArrowTrendingUpIcon className="h-4 w-4 text-green-500" />
-      case 'commit':
-        return <DocumentIcon className="h-4 w-4 text-purple-500" />
-      case 'error':
-        return <ExclamationTriangleIcon className="h-4 w-4 text-red-500" />
-      default:
-        return <DocumentIcon className="h-4 w-4 text-gray-500" />
-    }
-  }
 
   const getMetricColor = (color: MetricColor) => {
     const colors: Record<MetricColor, string> = {
@@ -250,31 +184,60 @@ export default function DashboardPage() {
     }
   }
 
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case 'build':
+        return <ChartBarIcon className="h-4 w-4 text-blue-500" />
+      case 'deploy':
+        return <ArrowTrendingUpIcon className="h-4 w-4 text-green-500" />
+      case 'commit':
+        return <DocumentIcon className="h-4 w-4 text-purple-500" />
+      case 'error':
+        return <ExclamationTriangleIcon className="h-4 w-4 text-red-500" />
+      case 'agent_task':
+        return <CpuChipIcon className="h-4 w-4 text-yellow-500" />
+      default:
+        return <DocumentIcon className="h-4 w-4 text-gray-500" />
+    }
+  }
+
   if (isLoading) {
     return (
       <DashboardLayout>
-        <div className="animate-pulse">
+        <div className="px-4 sm:px-6 lg:px-8">
+          <div className="mb-8">
+            <Skeleton height={32} width={200} />
+            <Skeleton height={20} width={400} className="mt-2" />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="card p-6">
-                <div className="skeleton h-8 w-20 mb-2" />
-                <div className="skeleton h-12 w-16 mb-4" />
-                <div className="skeleton h-4 w-24" />
+                <Skeleton height={48} width={48} className="mb-4" />
+                <Skeleton height={32} width={100} className="mb-2" />
+                <Skeleton height={16} width={150} />
               </div>
             ))}
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 card p-6">
-              <div className="skeleton h-6 w-32 mb-4" />
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="skeleton h-16 w-full mb-3" />
-              ))}
-            </div>
-            <div className="card p-6">
-              <div className="skeleton h-6 w-24 mb-4" />
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="skeleton h-12 w-full mb-2" />
-              ))}
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (error && !metrics.length) {
+    return (
+      <DashboardLayout>
+        <div className="px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <ExclamationTriangleIcon className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Failed to load dashboard
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+              <button onClick={loadDashboardData} className="btn btn-primary">
+                <ArrowPathIcon className="h-4 w-4 mr-2" />
+                Try Again
+              </button>
             </div>
           </div>
         </div>
@@ -302,15 +265,12 @@ export default function DashboardPage() {
             const Icon = metric.icon
             return (
               <div key={index} className="card-hover p-6">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-4">
                   <div className={`p-3 rounded-lg ${getMetricColor(metric.color)}`}>
                     <Icon className="h-6 w-6" />
                   </div>
-                  <button className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
-                    <EllipsisHorizontalIcon className="h-5 w-5 text-gray-400" />
-                  </button>
                 </div>
-                <div className="mt-4">
+                <div>
                   <h3 className="text-2xl font-bold text-gray-900 dark:text-white">
                     {metric.value}
                   </h3>
@@ -324,7 +284,9 @@ export default function DashboardPage() {
                         className={`text-sm ml-1 ${
                           metric.change.trend === 'up'
                             ? 'text-green-600 dark:text-green-400'
-                            : 'text-red-600 dark:text-red-400'
+                            : metric.change.trend === 'down'
+                            ? 'text-red-600 dark:text-red-400'
+                            : 'text-gray-600 dark:text-gray-400'
                         }`}
                       >
                         {metric.change.value}
@@ -337,8 +299,100 @@ export default function DashboardPage() {
           })}
         </div>
 
-        {/* Projects & Activity sections would go here, using projects and activities state */}
-        {/* Example: map over projects and render cards, using getStatusIcon/getStatusBadge and coverage/team UI you had */}
+        {/* Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recent Activity */}
+          <div className="lg:col-span-2 card">
+            <div className="card-header">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Recent Activity
+              </h2>
+            </div>
+            <div className="card-body p-0">
+              {activities.length === 0 ? (
+                <EmptyState
+                  icon={ClockIcon}
+                  title="No recent activity"
+                  description="Activity will appear here as you use the platform"
+                />
+              ) : (
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {activities.map((activity) => (
+                    <div
+                      key={activity.id}
+                      className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    >
+                      <div className="flex items-start space-x-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          {getActivityIcon(activity.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-900 dark:text-white">
+                            {activity.message}
+                          </p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {formatDistanceToNow(new Date(activity.timestamp), {
+                              addSuffix: true
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Quick Links */}
+          <div className="card">
+            <div className="card-header">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Quick Links
+              </h2>
+            </div>
+            <div className="card-body">
+              <div className="space-y-2">
+                <Link
+                  href="/repositories"
+                  className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <DocumentIcon className="h-5 w-5 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    Repositories ({repositories.length})
+                  </span>
+                </Link>
+                <Link
+                  href="/projects"
+                  className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <FolderIcon className="h-5 w-5 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    Projects
+                  </span>
+                </Link>
+                <Link
+                  href="/organizations"
+                  className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <UserGroupIcon className="h-5 w-5 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    Organizations ({organizations.length})
+                  </span>
+                </Link>
+                <Link
+                  href="/agents"
+                  className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <CpuChipIcon className="h-5 w-5 text-gray-400" />
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">
+                    AI Agents
+                  </span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   )

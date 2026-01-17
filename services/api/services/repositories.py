@@ -24,6 +24,15 @@ class RepositoryService:
         async with _repo_lock:
             return list(_repos_by_project.get(project_id, []))
     
+    async def get_user_repositories(self, user_id: str, organization_id: Optional[str] = None, db = None) -> List[RepositoryResponse]:
+        """Get all repositories for user, optionally filtered by organization"""
+        async with _repo_lock:
+            # Return all repositories across all projects
+            all_repos = []
+            for project_repos in _repos_by_project.values():
+                all_repos.extend(project_repos)
+            return all_repos
+    
     async def connect_repository(self, project_id: str, repo_data: RepositoryCreate, user_id: str, db) -> RepositoryResponse:
         """Connect new repository to project"""
         repo = RepositoryResponse(

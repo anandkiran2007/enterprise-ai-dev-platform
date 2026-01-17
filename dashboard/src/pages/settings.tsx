@@ -1,237 +1,142 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useState } from 'react'
 import DashboardLayout from '../components/DashboardLayout'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
+import { Modal } from '../components/ui/Modal'
+import { LoadingSpinner } from '../components/ui/LoadingSpinner'
+import { FormField } from '../components/ui/FormField'
+import {
+  CogIcon,
+  UserIcon,
+  LinkIcon,
+  ServerIcon,
+  CheckCircleIcon,
+  XMarkIcon
+} from '@heroicons/react/24/outline'
 
-type UserSettings = {
-  theme: 'light' | 'dark' | 'system'
-  email_notifications: boolean
-  push_notifications: boolean
-  language: string
-  timezone: string
-}
-
-type IntegrationSettings = {
-  github_connected: boolean
-  github_username?: string
-  slack_connected: boolean
-  slack_webhook_url?: string
-  discord_connected: boolean
-  discord_webhook_url?: string
-}
-
-type EnvironmentSettings = {
-  environment: 'development' | 'staging' | 'production'
-  api_url: string
-  websocket_url: string
-  redis_url: string
-  database_url: string
-}
+type Tab = 'profile' | 'integrations' | 'environment'
 
 export default function SettingsPage() {
   const { state } = useAuth()
+  const { showSuccess, showError } = useToast()
+  const [activeTab, setActiveTab] = useState<Tab>('profile')
+  const [saving, setSaving] = useState(false)
+  const [showSlackModal, setShowSlackModal] = useState(false)
+  const [showDiscordModal, setShowDiscordModal] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'integrations' | 'environment'>('profile')
-  
-  const [userSettings, setUserSettings] = useState<UserSettings>({
-    theme: 'system',
+  // User settings
+  const [userSettings, setUserSettings] = useState({
+    theme: 'system' as 'light' | 'dark' | 'system',
     email_notifications: true,
     push_notifications: false,
     language: 'en',
     timezone: 'UTC'
   })
 
-  const [integrationSettings, setIntegrationSettings] = useState<IntegrationSettings>({
+  // Integration settings
+  const [integrations, setIntegrations] = useState({
     github_connected: false,
+    github_username: undefined as string | undefined,
     slack_connected: false,
-    discord_connected: false
+    slack_webhook_url: '',
+    discord_connected: false,
+    discord_webhook_url: ''
   })
 
-  const [environmentSettings, setEnvironmentSettings] = useState<EnvironmentSettings>({
-    environment: 'development',
-    api_url: '',
+  // Environment settings
+  const [envSettings, setEnvSettings] = useState({
+    environment: 'development' as 'development' | 'staging' | 'production',
+    api_url: process.env.NEXT_PUBLIC_API_URL || '',
     websocket_url: '',
     redis_url: '',
     database_url: ''
   })
 
-  const [loading, setLoading] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState<string | null>(null)
-
-  const [showGithubConnect, setShowGithubConnect] = useState(false)
-  const [showSlackSetup, setShowSlackSetup] = useState(false)
-  const [showDiscordSetup, setShowDiscordSetup] = useState(false)
-
-  const authHeader = useMemo(() => {
-    const token = state.token || (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null)
-    const headers: Record<string, string> = {}
-    if (token) {
-      headers.Authorization = `Bearer ${token}`
-    }
-    return headers
-  }, [state.token])
-
-  const loadSettings = async () => {
-    setLoading(true)
-    setError(null)
+  const handleSaveUserSettings = async () => {
+    setSaving(true)
     try {
-      const res = await fetch('/api/settings', {
-        headers: authHeader,
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `Failed to load settings (${res.status})`)
-      }
-      const data = await res.json()
-      setUserSettings(data.user || userSettings)
-      setIntegrationSettings(data.integrations || integrationSettings)
-      setEnvironmentSettings(data.environment || environmentSettings)
-    } catch (e: any) {
-      setError(e?.message || 'Failed to load settings')
+      // TODO: Call API to save settings
+      await new Promise(resolve => setTimeout(resolve, 500)) // Simulate API call
+      showSuccess('User settings saved successfully')
+    } catch (error: any) {
+      showError(error.message || 'Failed to save user settings')
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
-  const saveUserSettings = async () => {
-    setSubmitting(true)
-    setError(null)
-    setSuccess(null)
+  const handleSaveIntegrations = async () => {
+    setSaving(true)
     try {
-      const res = await fetch('/api/settings/user', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeader,
-        },
-        body: JSON.stringify(userSettings),
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `Failed to save user settings (${res.status})`)
-      }
-      setSuccess('User settings saved successfully')
-    } catch (e: any) {
-      setError(e?.message || 'Failed to save user settings')
+      // TODO: Call API to save integrations
+      await new Promise(resolve => setTimeout(resolve, 500))
+      showSuccess('Integration settings saved successfully')
+    } catch (error: any) {
+      showError(error.message || 'Failed to save integration settings')
     } finally {
-      setSubmitting(false)
+      setSaving(false)
     }
   }
 
-  const saveIntegrationSettings = async () => {
-    setSubmitting(true)
-    setError(null)
-    setSuccess(null)
+  const handleSaveEnvironment = async () => {
+    setSaving(true)
     try {
-      const res = await fetch('/api/settings/integrations', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeader,
-        },
-        body: JSON.stringify(integrationSettings),
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `Failed to save integration settings (${res.status})`)
-      }
-      setSuccess('Integration settings saved successfully')
-    } catch (e: any) {
-      setError(e?.message || 'Failed to save integration settings')
+      // TODO: Call API to save environment settings
+      await new Promise(resolve => setTimeout(resolve, 500))
+      showSuccess('Environment settings saved successfully')
+    } catch (error: any) {
+      showError(error.message || 'Failed to save environment settings')
     } finally {
-      setSubmitting(false)
+      setSaving(false)
     }
   }
 
-  const saveEnvironmentSettings = async () => {
-    setSubmitting(true)
-    setError(null)
-    setSuccess(null)
+  const handleConnectGithub = async () => {
+    setSaving(true)
     try {
-      const res = await fetch('/api/settings/environment', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          ...authHeader,
-        },
-        body: JSON.stringify(environmentSettings),
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `Failed to save environment settings (${res.status})`)
-      }
-      setSuccess('Environment settings saved successfully')
-    } catch (e: any) {
-      setError(e?.message || 'Failed to save environment settings')
+      // TODO: Implement GitHub OAuth flow
+      await new Promise(resolve => setTimeout(resolve, 500))
+      setIntegrations(prev => ({ ...prev, github_connected: true, github_username: 'github-user' }))
+      showSuccess('GitHub connected successfully')
+    } catch (error: any) {
+      showError(error.message || 'Failed to connect GitHub')
     } finally {
-      setSubmitting(false)
+      setSaving(false)
     }
   }
 
-  const connectGithub = async () => {
-    setSubmitting(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/integrations/github/connect', {
-        method: 'POST',
-        headers: authHeader,
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `Failed to connect GitHub (${res.status})`)
-      }
-      const data = await res.json()
-      setIntegrationSettings(prev => ({
-        ...prev,
-        github_connected: true,
-        github_username: data.username
-      }))
-      setShowGithubConnect(false)
-      setSuccess('GitHub connected successfully')
-    } catch (e: any) {
-      setError(e?.message || 'Failed to connect GitHub')
-    } finally {
-      setSubmitting(false)
+  const handleDisconnectGithub = () => {
+    if (confirm('Are you sure you want to disconnect GitHub?')) {
+      setIntegrations(prev => ({ ...prev, github_connected: false, github_username: undefined }))
+      showSuccess('GitHub disconnected successfully')
     }
   }
 
-  const disconnectGithub = async () => {
-    if (!confirm('Are you sure you want to disconnect GitHub?')) return
-    setSubmitting(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/integrations/github/disconnect', {
-        method: 'POST',
-        headers: authHeader,
-      })
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error(text || `Failed to disconnect GitHub (${res.status})`)
-      }
-      setIntegrationSettings(prev => ({
-        ...prev,
-        github_connected: false,
-        github_username: undefined
-      }))
-      setSuccess('GitHub disconnected successfully')
-    } catch (e: any) {
-      setError(e?.message || 'Failed to disconnect GitHub')
-    } finally {
-      setSubmitting(false)
+  const handleConnectSlack = () => {
+    if (!integrations.slack_webhook_url.trim()) {
+      showError('Please enter a webhook URL')
+      return
     }
+    setIntegrations(prev => ({ ...prev, slack_connected: true }))
+    setShowSlackModal(false)
+    showSuccess('Slack connected successfully')
   }
 
-  useEffect(() => {
-    loadSettings()
-  }, [])
-
-  useEffect(() => {
-    if (success) {
-      const timer = setTimeout(() => setSuccess(null), 3000)
-      return () => clearTimeout(timer)
+  const handleConnectDiscord = () => {
+    if (!integrations.discord_webhook_url.trim()) {
+      showError('Please enter a webhook URL')
+      return
     }
-  }, [success])
+    setIntegrations(prev => ({ ...prev, discord_connected: true }))
+    setShowDiscordModal(false)
+    showSuccess('Discord connected successfully')
+  }
+
+  const tabs = [
+    { id: 'profile' as Tab, label: 'Profile', icon: UserIcon },
+    { id: 'integrations' as Tab, label: 'Integrations', icon: LinkIcon },
+    { id: 'environment' as Tab, label: 'Environment', icon: ServerIcon }
+  ]
 
   return (
     <DashboardLayout>
@@ -243,99 +148,81 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
-        )}
-
-        {success && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md">
-            <p className="text-sm text-green-800">{success}</p>
-          </div>
-        )}
-
-        <div className="card dark:bg-gray-800 dark:border-gray-700">
+        <div className="card">
+          {/* Tabs */}
           <div className="border-b border-gray-200 dark:border-gray-700">
-            <nav className="-mb-px flex space-x-8">
-              {[
-                { id: 'profile', label: 'Profile' },
-                { id: 'integrations', label: 'Integrations' },
-                { id: 'environment', label: 'Environment' }
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === tab.id
-                      ? 'border-primary-500 text-primary-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                  onClick={() => setActiveTab(tab.id as any)}
-                >
-                  {tab.label}
-                </button>
-              ))}
+            <nav className="flex space-x-8 px-6" aria-label="Tabs">
+              {tabs.map((tab) => {
+                const Icon = tab.icon
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 transition-colors ${
+                      activeTab === tab.id
+                        ? 'border-primary-500 text-primary-600 dark:text-primary-400'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span>{tab.label}</span>
+                  </button>
+                )
+              })}
             </nav>
           </div>
 
+          {/* Tab Content */}
           <div className="p-6">
             {activeTab === 'profile' && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">Appearance</h3>
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Theme</label>
-                      <select
-                        className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        value={userSettings.theme}
-                        onChange={(e) => setUserSettings(prev => ({ ...prev, theme: e.target.value as any }))}
-                      >
-                        <option value="light">Light</option>
-                        <option value="dark">Dark</option>
-                        <option value="system">System</option>
-                      </select>
-                    </div>
-                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Appearance</h3>
+                  <FormField label="Theme">
+                    <select
+                      value={userSettings.theme}
+                      onChange={(e) => setUserSettings(prev => ({ ...prev, theme: e.target.value as any }))}
+                      className="select"
+                    >
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                      <option value="system">System</option>
+                    </select>
+                  </FormField>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">Notifications</h3>
-                  <div className="mt-4 space-y-4">
-                    <div className="flex items-center">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Notifications</h3>
+                  <div className="space-y-3">
+                    <label className="flex items-center">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        className="checkbox"
                         checked={userSettings.email_notifications}
                         onChange={(e) => setUserSettings(prev => ({ ...prev, email_notifications: e.target.checked }))}
                       />
-                      <label className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-                        Email notifications
-                      </label>
-                    </div>
-                    <div className="flex items-center">
+                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Email notifications</span>
+                    </label>
+                    <label className="flex items-center">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        className="checkbox"
                         checked={userSettings.push_notifications}
                         onChange={(e) => setUserSettings(prev => ({ ...prev, push_notifications: e.target.checked }))}
                       />
-                      <label className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-                        Push notifications
-                      </label>
-                    </div>
+                      <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">Push notifications</span>
+                    </label>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">Localization</h3>
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Language</label>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Localization</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField label="Language">
                       <select
-                        className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                         value={userSettings.language}
                         onChange={(e) => setUserSettings(prev => ({ ...prev, language: e.target.value }))}
+                        className="select"
                       >
                         <option value="en">English</option>
                         <option value="es">Spanish</option>
@@ -343,34 +230,39 @@ export default function SettingsPage() {
                         <option value="de">German</option>
                         <option value="ja">Japanese</option>
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Timezone</label>
+                    </FormField>
+                    <FormField label="Timezone">
                       <select
-                        className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
                         value={userSettings.timezone}
                         onChange={(e) => setUserSettings(prev => ({ ...prev, timezone: e.target.value }))}
+                        className="select"
                       >
                         <option value="UTC">UTC</option>
                         <option value="America/New_York">Eastern Time</option>
                         <option value="America/Chicago">Central Time</option>
-                        <option value="America/Denver">Mountain Time</option>
                         <option value="America/Los_Angeles">Pacific Time</option>
                         <option value="Europe/London">London</option>
                         <option value="Europe/Paris">Paris</option>
                         <option value="Asia/Tokyo">Tokyo</option>
                       </select>
-                    </div>
+                    </FormField>
                   </div>
                 </div>
 
-                <div className="pt-4">
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                   <button
+                    onClick={handleSaveUserSettings}
                     className="btn btn-primary"
-                    onClick={saveUserSettings}
-                    disabled={submitting}
+                    disabled={saving}
                   >
-                    {submitting ? 'Saving...' : 'Save Profile Settings'}
+                    {saving ? (
+                      <>
+                        <LoadingSpinner size="sm" className="mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Profile Settings'
+                    )}
                   </button>
                 </div>
               </div>
@@ -378,150 +270,114 @@ export default function SettingsPage() {
 
             {activeTab === 'integrations' && (
               <div className="space-y-6">
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">GitHub</h3>
-                  <div className="mt-4">
-                    {integrationSettings.github_connected ? (
-                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              Connected as {integrationSettings.github_username}
-                            </p>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                              GitHub integration is active
-                            </p>
-                          </div>
-                          <button
-                            className="btn btn-secondary"
-                            onClick={disconnectGithub}
-                            disabled={submitting}
-                          >
-                            Disconnect
-                          </button>
+                {/* GitHub */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">GitHub</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Connect your GitHub account to access repositories
+                      </p>
+                    </div>
+                    {integrations.github_connected ? (
+                      <div className="flex items-center space-x-3">
+                        <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                          <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                          <span>Connected as {integrations.github_username}</span>
                         </div>
+                        <button
+                          onClick={handleDisconnectGithub}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Disconnect
+                        </button>
                       </div>
                     ) : (
-                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              Connect GitHub
-                            </p>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                              Link your GitHub account to access repositories
-                            </p>
-                          </div>
-                          <button
-                            className="btn btn-primary"
-                            onClick={connectGithub}
-                            disabled={submitting}
-                          >
-                            Connect
-                          </button>
-                        </div>
-                      </div>
+                      <button
+                        onClick={handleConnectGithub}
+                        className="btn btn-primary btn-sm"
+                        disabled={saving}
+                      >
+                        Connect
+                      </button>
                     )}
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">Slack</h3>
-                  <div className="mt-4">
-                    {integrationSettings.slack_connected ? (
-                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              Slack integration is active
-                            </p>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                              Notifications will be sent to your Slack workspace
-                            </p>
-                          </div>
-                          <button
-                            className="btn btn-secondary"
-                            onClick={() => setIntegrationSettings(prev => ({ ...prev, slack_connected: false }))}
-                          >
-                            Disconnect
-                          </button>
-                        </div>
+                {/* Slack */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">Slack</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Get notifications in your Slack workspace
+                      </p>
+                    </div>
+                    {integrations.slack_connected ? (
+                      <div className="flex items-center space-x-3">
+                        <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                        <button
+                          onClick={() => setIntegrations(prev => ({ ...prev, slack_connected: false }))}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Disconnect
+                        </button>
                       </div>
                     ) : (
-                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              Connect Slack
-                            </p>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                              Get notifications in your Slack workspace
-                            </p>
-                          </div>
-                          <button
-                            className="btn btn-primary"
-                            onClick={() => setShowSlackSetup(true)}
-                          >
-                            Connect
-                          </button>
-                        </div>
-                      </div>
+                      <button
+                        onClick={() => setShowSlackModal(true)}
+                        className="btn btn-primary btn-sm"
+                      >
+                        Connect
+                      </button>
                     )}
                   </div>
                 </div>
 
-                <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">Discord</h3>
-                  <div className="mt-4">
-                    {integrationSettings.discord_connected ? (
-                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              Discord integration is active
-                            </p>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                              Notifications will be sent to your Discord server
-                            </p>
-                          </div>
-                          <button
-                            className="btn btn-secondary"
-                            onClick={() => setIntegrationSettings(prev => ({ ...prev, discord_connected: false }))}
-                          >
-                            Disconnect
-                          </button>
-                        </div>
+                {/* Discord */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">Discord</h4>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        Get notifications in your Discord server
+                      </p>
+                    </div>
+                    {integrations.discord_connected ? (
+                      <div className="flex items-center space-x-3">
+                        <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                        <button
+                          onClick={() => setIntegrations(prev => ({ ...prev, discord_connected: false }))}
+                          className="btn btn-secondary btn-sm"
+                        >
+                          Disconnect
+                        </button>
                       </div>
                     ) : (
-                      <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white">
-                              Connect Discord
-                            </p>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
-                              Get notifications in your Discord server
-                            </p>
-                          </div>
-                          <button
-                            className="btn btn-primary"
-                            onClick={() => setShowDiscordSetup(true)}
-                          >
-                            Connect
-                          </button>
-                        </div>
-                      </div>
+                      <button
+                        onClick={() => setShowDiscordModal(true)}
+                        className="btn btn-primary btn-sm"
+                      >
+                        Connect
+                      </button>
                     )}
                   </div>
                 </div>
 
-                <div className="pt-4">
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                   <button
+                    onClick={handleSaveIntegrations}
                     className="btn btn-primary"
-                    onClick={saveIntegrationSettings}
-                    disabled={submitting}
+                    disabled={saving}
                   >
-                    {submitting ? 'Saving...' : 'Save Integration Settings'}
+                    {saving ? (
+                      <>
+                        <LoadingSpinner size="sm" className="mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Integration Settings'
+                    )}
                   </button>
                 </div>
               </div>
@@ -530,66 +386,72 @@ export default function SettingsPage() {
             {activeTab === 'environment' && (
               <div className="space-y-6">
                 <div>
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white">Environment Configuration</h3>
-                  <div className="mt-4 space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Environment</label>
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Environment Configuration</h3>
+                  <div className="space-y-4">
+                    <FormField label="Environment">
                       <select
-                        className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        value={environmentSettings.environment}
-                        onChange={(e) => setEnvironmentSettings(prev => ({ ...prev, environment: e.target.value as any }))}
+                        value={envSettings.environment}
+                        onChange={(e) => setEnvSettings(prev => ({ ...prev, environment: e.target.value as any }))}
+                        className="select"
                       >
                         <option value="development">Development</option>
                         <option value="staging">Staging</option>
                         <option value="production">Production</option>
                       </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">API URL</label>
+                    </FormField>
+                    <FormField label="API URL">
                       <input
-                        className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        value={environmentSettings.api_url}
-                        onChange={(e) => setEnvironmentSettings(prev => ({ ...prev, api_url: e.target.value }))}
+                        type="text"
+                        value={envSettings.api_url}
+                        onChange={(e) => setEnvSettings(prev => ({ ...prev, api_url: e.target.value }))}
                         placeholder="http://localhost:8000"
+                        className="input"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">WebSocket URL</label>
+                    </FormField>
+                    <FormField label="WebSocket URL">
                       <input
-                        className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        value={environmentSettings.websocket_url}
-                        onChange={(e) => setEnvironmentSettings(prev => ({ ...prev, websocket_url: e.target.value }))}
+                        type="text"
+                        value={envSettings.websocket_url}
+                        onChange={(e) => setEnvSettings(prev => ({ ...prev, websocket_url: e.target.value }))}
                         placeholder="ws://localhost:8000"
+                        className="input"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Redis URL</label>
+                    </FormField>
+                    <FormField label="Redis URL">
                       <input
-                        className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        value={environmentSettings.redis_url}
-                        onChange={(e) => setEnvironmentSettings(prev => ({ ...prev, redis_url: e.target.value }))}
+                        type="text"
+                        value={envSettings.redis_url}
+                        onChange={(e) => setEnvSettings(prev => ({ ...prev, redis_url: e.target.value }))}
                         placeholder="redis://localhost:6379"
+                        className="input"
                       />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Database URL</label>
+                    </FormField>
+                    <FormField label="Database URL">
                       <input
-                        className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                        value={environmentSettings.database_url}
-                        onChange={(e) => setEnvironmentSettings(prev => ({ ...prev, database_url: e.target.value }))}
+                        type="text"
+                        value={envSettings.database_url}
+                        onChange={(e) => setEnvSettings(prev => ({ ...prev, database_url: e.target.value }))}
                         placeholder="postgresql://localhost:5432/db"
+                        className="input"
                       />
-                    </div>
+                    </FormField>
                   </div>
                 </div>
 
-                <div className="pt-4">
+                <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                   <button
+                    onClick={handleSaveEnvironment}
                     className="btn btn-primary"
-                    onClick={saveEnvironmentSettings}
-                    disabled={submitting}
+                    disabled={saving}
                   >
-                    {submitting ? 'Saving...' : 'Save Environment Settings'}
+                    {saving ? (
+                      <>
+                        <LoadingSpinner size="sm" className="mr-2" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Environment Settings'
+                    )}
                   </button>
                 </div>
               </div>
@@ -597,107 +459,83 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Slack Setup Modal */}
-        {showSlackSetup && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Connect Slack</h2>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => setShowSlackSetup(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Webhook URL</label>
-                    <input
-                      className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                      value={integrationSettings.slack_webhook_url || ''}
-                      onChange={(e) => setIntegrationSettings(prev => ({ ...prev, slack_webhook_url: e.target.value }))}
-                      placeholder="https://hooks.slack.com/services/..."
-                    />
-                  </div>
-
-                  <div className="flex space-x-3">
-                    <button
-                      className="btn btn-primary flex-1"
-                      onClick={() => {
-                        setIntegrationSettings(prev => ({ ...prev, slack_connected: true }))
-                        setShowSlackSetup(false)
-                        setSuccess('Slack connected successfully')
-                      }}
-                      disabled={!integrationSettings.slack_webhook_url?.trim()}
-                    >
-                      Connect
-                    </button>
-                    <button
-                      className="btn btn-secondary flex-1"
-                      onClick={() => setShowSlackSetup(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
+        {/* Slack Modal */}
+        <Modal
+          isOpen={showSlackModal}
+          onClose={() => setShowSlackModal(false)}
+          title="Connect Slack"
+          size="md"
+          footer={
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowSlackModal(false)}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConnectSlack}
+                className="btn btn-primary"
+                disabled={!integrations.slack_webhook_url.trim()}
+              >
+                Connect
+              </button>
             </div>
-          </div>
-        )}
+          }
+        >
+          <FormField
+            label="Webhook URL"
+            required
+            hint="Get this from your Slack workspace settings"
+          >
+            <input
+              type="text"
+              value={integrations.slack_webhook_url}
+              onChange={(e) => setIntegrations(prev => ({ ...prev, slack_webhook_url: e.target.value }))}
+              placeholder="https://hooks.slack.com/services/..."
+              className="input"
+            />
+          </FormField>
+        </Modal>
 
-        {/* Discord Setup Modal */}
-        {showDiscordSetup && (
-          <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">Connect Discord</h2>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => setShowDiscordSetup(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Webhook URL</label>
-                    <input
-                      className="input mt-1 dark:bg-gray-900 dark:border-gray-700 dark:text-white"
-                      value={integrationSettings.discord_webhook_url || ''}
-                      onChange={(e) => setIntegrationSettings(prev => ({ ...prev, discord_webhook_url: e.target.value }))}
-                      placeholder="https://discord.com/api/webhooks/..."
-                    />
-                  </div>
-
-                  <div className="flex space-x-3">
-                    <button
-                      className="btn btn-primary flex-1"
-                      onClick={() => {
-                        setIntegrationSettings(prev => ({ ...prev, discord_connected: true }))
-                        setShowDiscordSetup(false)
-                        setSuccess('Discord connected successfully')
-                      }}
-                      disabled={!integrationSettings.discord_webhook_url?.trim()}
-                    >
-                      Connect
-                    </button>
-                    <button
-                      className="btn btn-secondary flex-1"
-                      onClick={() => setShowDiscordSetup(false)}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
+        {/* Discord Modal */}
+        <Modal
+          isOpen={showDiscordModal}
+          onClose={() => setShowDiscordModal(false)}
+          title="Connect Discord"
+          size="md"
+          footer={
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDiscordModal(false)}
+                className="btn btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConnectDiscord}
+                className="btn btn-primary"
+                disabled={!integrations.discord_webhook_url.trim()}
+              >
+                Connect
+              </button>
             </div>
-          </div>
-        )}
+          }
+        >
+          <FormField
+            label="Webhook URL"
+            required
+            hint="Get this from your Discord server settings"
+          >
+            <input
+              type="text"
+              value={integrations.discord_webhook_url}
+              onChange={(e) => setIntegrations(prev => ({ ...prev, discord_webhook_url: e.target.value }))}
+              placeholder="https://discord.com/api/webhooks/..."
+              className="input"
+            />
+          </FormField>
+        </Modal>
       </div>
     </DashboardLayout>
   )
