@@ -64,7 +64,7 @@ async function main() {
     const coordinator = new AgentCoordinator(memory, eventBus);
 
     // 2. Start Dashboard
-    const dashboard = new DashboardServer(memory, eventBus);
+    const dashboard = new DashboardServer(memory, eventBus, storageAdapter);
     dashboard.start();
 
     // 3. Initialize Agents

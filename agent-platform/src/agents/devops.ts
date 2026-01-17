@@ -1,10 +1,21 @@
 
 import { BaseAgent } from './base';
 import { EventType } from '../core/events';
+import { ProjectMemory } from '../core/memory';
+import { IEventBus } from '../core/event_bus_adapters';
+import { LLMService } from '../core/llm';
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { GitHubAdapter } from '../core/github_adapter';
+
 export class DevOpsAgent extends BaseAgent {
+    private github: GitHubAdapter;
+
+    constructor(role: string, memory: ProjectMemory, eventBus: IEventBus, llm: LLMService) {
+        super(role, memory, eventBus, llm);
+        this.github = new GitHubAdapter();
+    }
 
     initialize() {
         // Listen for QA passing, which signals we are ready to "deploy" (write to disk)
@@ -35,7 +46,7 @@ export class DevOpsAgent extends BaseAgent {
         });
 
         // Artificial delay for visualization
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         const snapshot = this.memory.getSnapshot();
         const outputDir = path.join(process.cwd(), 'output', snapshot.project_id);
@@ -61,6 +72,23 @@ export class DevOpsAgent extends BaseAgent {
                 snapshot.living_documents.api_contracts.openapi_spec
             );
         }
+
+        // --- NEW: Cloud Sync ---
+        const repoUrl = await this.github.createRepo(
+            snapshot.project_name || 'project',
+            snapshot.living_documents.requirements?.summary || 'AI Generated Project'
+        );
+
+        if (repoUrl) {
+            this.memory.updateDocument('github_repo', {
+                full_url: repoUrl,
+                summary: 'GitHub Repository',
+                version: '1.0.0',
+                last_modified_by: 'DevOps Agent'
+            });
+            console.log(`[DevOps Agent] Linked GitHub Repo: ${repoUrl}`);
+        }
+
 
         // 3. Write Frontend Code
         const frontend = snapshot.code_artifacts?.frontend;

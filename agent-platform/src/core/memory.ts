@@ -144,11 +144,16 @@ export class ProjectMemory {
         await this.storage.save(this.state);
     }
 
-    public async load() {
-        const loadedState = await this.storage.load(this.state.project_id);
+    public async load(projectId?: string) {
+        const idToLoad = projectId || this.state.project_id;
+        const loadedState = await this.storage.load(idToLoad);
         if (loadedState) {
             this.state = loadedState;
-            console.log('[Memory] State loaded from storage.');
+            console.log(`[Memory] State loaded for project: ${idToLoad}`);
+        } else if (projectId) {
+            // If switching to a new ID that doesn't exist, we might want to error or init empty?
+            // For now, let's assume we only switch to existing projects from the list.
+            console.warn(`[Memory] No state found for project: ${projectId}`);
         }
     }
 }

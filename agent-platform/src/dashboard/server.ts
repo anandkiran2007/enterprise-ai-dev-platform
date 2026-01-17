@@ -4,18 +4,22 @@ import cors from 'cors';
 import { ProjectMemory } from '../core/memory';
 import { EventType } from '../core/events';
 import { IEventBus } from '../core/event_bus_adapters';
+import { IStorageAdapter } from '../core/storage';
 
 export class DashboardServer {
     private app = express();
     private port = 3000;
     private memory: ProjectMemory;
     private eventBus: IEventBus;
+    private storage: IStorageAdapter;
     private eventLog: any[] = [];
 
-    constructor(memory: ProjectMemory, eventBus: IEventBus) {
+    constructor(memory: ProjectMemory, eventBus: IEventBus, storage: IStorageAdapter) {
         this.memory = memory;
         this.eventBus = eventBus;
+        this.storage = storage;
         this.app.use(cors());
+        this.app.use(express.json());
         this.app.use(express.static('src/dashboard/public'));
 
         // Capture all events
@@ -38,6 +42,30 @@ export class DashboardServer {
 
         this.app.get('/api/events', (req, res) => {
             res.json(this.eventLog);
+        });
+
+        this.app.get('/api/projects', async (req, res) => {
+            try {
+                const projects = await this.storage.listProjects();
+                res.json(projects);
+            } catch (e) {
+                res.status(500).json({ error: 'Failed to fetch projects' });
+            }
+        });
+
+        this.app.post('/api/project/load', async (req, res) => {
+            const { projectId } = req.body;
+            if (!projectId) return res.status(400).json({ error: 'Project ID required' });
+
+            try {
+                await this.memory.load(projectId);
+                // Also reset event log?
+                this.eventLog = [];
+                res.json({ success: true, message: `Loaded project ${projectId}` });
+            } catch (e) {
+                console.error('[Dashboard] Failed to load project', e);
+                res.status(500).json({ error: 'Failed to load project' });
+            }
         });
 
         this.app.post('/api/idea', (req, res) => {

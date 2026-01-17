@@ -37,6 +37,22 @@ export class PostgresStorageAdapter implements IStorageAdapter {
         }
     }
 
+    async listProjects(): Promise<Array<{ id: string; name: string; last_updated: Date }>> {
+        try {
+            const res = await this.pool.query(
+                `SELECT project_id, state->>'project_name' as name, updated_at FROM project_memory ORDER BY updated_at DESC`
+            );
+            return res.rows.map(row => ({
+                id: row.project_id,
+                name: row.name || 'Untitled Project',
+                last_updated: row.updated_at
+            }));
+        } catch (e) {
+            console.error('[Postgres] Failed to list projects', e);
+            return [];
+        }
+    }
+
     async save(state: ProjectMemoryState): Promise<void> {
         try {
             await this.pool.query(

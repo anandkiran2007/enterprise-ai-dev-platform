@@ -140,9 +140,21 @@ export default function Dashboard() {
               <Settings size={20} />
             </button>
             <div className="bg-gray-900 px-4 py-2 rounded-full border border-gray-800 flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
               <span className="text-sm font-medium">{memory.current_phase.toUpperCase()} PHASE</span>
             </div>
+
+            {/* GitHub Repo Button */}
+            {memory.living_documents.github_repo && (
+              <a
+                href={memory.living_documents.github_repo.full_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-gray-900 px-4 py-2 rounded-full border border-gray-800 flex items-center gap-2 hover:bg-gray-800 hover:border-gray-600 transition-colors"
+              >
+                <Github size={18} className="text-white" />
+                <span className="text-sm font-medium text-white">View Code</span>
+              </a>
+            )}
           </div>
         </div>
 
