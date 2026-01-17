@@ -33,6 +33,23 @@ export class FrontendSDEAgent extends BaseAgent {
 
     async act(): Promise<boolean> {
         const context = this.getContext();
+        const snapshot = this.memory.getSnapshot();
+
+        // Auto-Resume / Catch-up Logic
+        if (context.project_phase === 'development') {
+            // Check if we have artifacts but haven't generated code
+            const hasUX = !!snapshot.living_documents.ux_design;
+            const hasAPI = !!snapshot.living_documents.api_contracts;
+            const hasCode = !!snapshot.code_artifacts.frontend?.generated_code;
+
+            if (hasUX && hasAPI && !hasCode && context.my_current_task.currently_working_on !== 'frontend_implementation') {
+                console.log('[Frontend SDE] Found inputs but no code. Auto-starting implementation.');
+                this.hasDesign = true;
+                this.hasApi = true;
+                this.checkDependencies();
+                return true;
+            }
+        }
 
         if (context.my_current_task && context.my_current_task.currently_working_on === 'frontend_implementation') {
             console.log('[Frontend SDE] Generating React components...');

@@ -26,7 +26,28 @@ export class TeacherAgent extends BaseAgent {
     private async analyzeFailure(agentRole: string, action: string, error: string) {
         this.log(`Analyzing failure: ${action} failed with "${error}"`);
 
-        // Ask LLM to deduce a guideline
+        // --- Active Reinforcement / Kill Switch Logic ---
+        // If QA fails due to missing code, explicitly restart Frontend
+        if (agentRole === 'qa_engineer' && error.includes('No frontend code found')) {
+            console.log('[Teacher Agent] 🚨 Critical Failure Detected: QA cannot test because code is missing.');
+            console.log('[Teacher Agent] ⚡ TEACHER INTERVENTION: Ordering Frontend Agent to regenerate code immediately.');
+
+            // 1. Force Phase Revert (Reinforcment)
+            this.memory.updatePhase('development');
+
+            // 2. Clear bad state if needed
+            // this.memory.updateDocument('code_artifacts', { frontend: null }); // Optional: force clean slate
+
+            // 3. Emit Command
+            this.eventBus.emit(EventType.ACTION_FAILED, this.role, {
+                action: 'intervention',
+                error: 'Frontend Code Missing - RESTARTING DEVELOPMENT'
+            });
+
+            return; // Skip LLM analysis for known operational fixes
+        }
+
+        // Ask LLM to deduce a guideline for other unknown errors
         const prompt = `
         A software agent (${agentRole}) failed to perform action "${action}".
         Error message: "${error}".

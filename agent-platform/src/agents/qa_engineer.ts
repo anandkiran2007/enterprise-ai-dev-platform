@@ -21,11 +21,36 @@ export class QAEngineerAgent extends BaseAgent {
         };
     }
 
+    private isTestRunning = false;
+
     async act(): Promise<boolean> {
+        // State Reconciliation / Auto-Resume Logic
+        const snapshot = this.memory.getSnapshot();
+        const context = snapshot.agent_context_pointers[this.role];
+        const isPhaseCorrect = snapshot.current_phase === 'testing';
+        const isIdle = context.currently_working_on === 'idle' || context.currently_working_on === 'qa_testing';
+        const hasPassed = snapshot.living_documents['test_coverage']?.unit_tests === 'PASSED';
+
+        // If we are in testing phase, haven't passed, and aren't currently running (in this process)
+        if (isPhaseCorrect && !hasPassed && !this.isTestRunning) {
+            console.log('[QA Engineer] Detected pending QA task from saved state. Resuming...');
+            const code = snapshot.code_artifacts.frontend?.generated_code;
+            if (code) {
+                this.startQA(code);
+                return true;
+            } else {
+                console.log('[QA Engineer] Cannot test: No frontend code found. Reverting to Development phase.');
+                this.memory.updatePhase('development');
+                return true;
+            }
+        }
         return false;
     }
 
     private startQA(componentCode?: string) {
+        if (this.isTestRunning) return;
+        this.isTestRunning = true;
+
         this.memory.updatePhase('testing');
         this.memory.updateAgentContext(this.role, {
             currently_working_on: 'qa_testing',
@@ -33,10 +58,14 @@ export class QAEngineerAgent extends BaseAgent {
         });
 
         // Trigger asynchronous testing
-        this.performTests(componentCode).catch(err => {
-            console.error('[QA Engineer] Test execution failed:', err);
-            this.emitFailure('test_execution', err.message);
-        });
+        this.performTests(componentCode)
+            .catch(err => {
+                console.error('[QA Engineer] Test execution failed:', err);
+                this.emitFailure('test_execution', err.message);
+            })
+            .finally(() => {
+                this.isTestRunning = false;
+            });
     }
 
     private async performTests(componentCode?: string) {
