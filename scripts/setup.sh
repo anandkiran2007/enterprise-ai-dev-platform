@@ -34,7 +34,14 @@ docker-compose up -d postgres redis minio
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to be ready..."
-sleep 10
+sleep 15
+
+# Check if PostgreSQL is ready
+echo "🔍 Checking PostgreSQL connection..."
+until docker-compose exec postgres pg_isready -U postgres; do
+  echo "PostgreSQL is unavailable - sleeping..."
+  sleep 2
+done
 
 # Run database migrations
 echo "🗄️ Running database migrations..."
