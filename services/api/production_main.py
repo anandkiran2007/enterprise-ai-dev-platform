@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .database import init_db
 from .config.production import get_production_settings
 from .middleware import LoggingMiddleware, RateLimitMiddleware, setup_error_handlers
+from .middleware.rate_limit import GitHubOAuthRateLimitMiddleware, SessionRateLimitMiddleware
 from .routers import auth, organizations, projects, repositories, features, agents, integration
 from .services.production_auth import ProductionAuthService
 
@@ -75,10 +76,23 @@ def create_production_app() -> FastAPI:
         LoggingMiddleware
     )
     
+    # Add GitHub OAuth rate limiting (5 requests per minute per client)
+    app.add_middleware(
+        GitHubOAuthRateLimitMiddleware,
+        max_requests=5,
+        window_seconds=60
+    )
+    
+    # Add session-based rate limiting
+    app.add_middleware(
+        SessionRateLimitMiddleware
+    )
+    
+    # Add general rate limiting (100 requests per minute per IP)
     app.add_middleware(
         RateLimitMiddleware,
-        calls=settings.rate_limit_calls,
-        period=settings.rate_limit_period
+        calls=100,
+        period=60
     )
     
     # Setup error handlers

@@ -63,15 +63,16 @@ class ProductionAuthService(AuthService):
             print(f"Cache set error: {e}")
     
     async def _check_github_rate_limit(self, endpoint: str) -> bool:
-        """Check GitHub API rate limits"""
+        """Check GitHub API rate limits with better handling"""
         current_time = time.time()
         key = f"github_rate:{endpoint}"
         
         if key not in self._github_rate_limit:
             self._github_rate_limit[key] = []
         
-        # Clean old requests (1 hour window)
-        cutoff = current_time - 3600
+        # Clean old entries (1 hour window for authenticated, 1 minute for search)
+        window = 3600 if endpoint != 'search' else 60
+        cutoff = current_time - window
         self._github_rate_limit[key] = [
             req_time for req_time in self._github_rate_limit[key] 
             if req_time > cutoff
@@ -80,11 +81,28 @@ class ProductionAuthService(AuthService):
         # GitHub limits: 5000 requests/hour for authenticated, 60/hour for search
         limit = 5000 if endpoint != 'search' else 60
         
+        if len(self._github_rate_limit[key]) >= limit * 0.9:  # 90% threshold
+            print(f"Warning: GitHub API rate limit approaching for {endpoint}: {len(self._github_rate_limit[key])}/{limit}")
+            return False
+        
         if len(self._github_rate_limit[key]) >= limit:
+            print(f"Error: GitHub API rate limit exceeded for {endpoint}: {len(self._github_rate_limit[key])}/{limit}")
             return False
         
         self._github_rate_limit[key].append(current_time)
         return True
+    
+    async def _get_github_rate_limit_status(self) -> Dict[str, Any]:
+        """Get current GitHub API rate limit status"""
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get("https://api.github.com/rate_limit", timeout=5)
+                if response.status_code == 200:
+                    return response.json()
+        except Exception as e:
+            print(f"Failed to get GitHub rate limit status: {e}")
+        
+        return {"resources": {"core": {"remaining": 0, "limit": 0}}}
     
     async def authenticate_github(self, code: str, redirect_uri: str, db) -> Dict[str, Any]:
         """Production-ready GitHub authentication with caching"""
