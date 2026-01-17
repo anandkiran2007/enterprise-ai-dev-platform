@@ -26,9 +26,12 @@ async def get_projects(
 ):
     """Get projects for organization"""
     try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
         projects = await project_service.get_organization_projects(
             org_id=org_id,
-            user_id=current_user.id,
+            user_id=user_id,
             db=db
         )
         return projects
@@ -48,10 +51,13 @@ async def create_project(
 ):
     """Create new project"""
     try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
         project = await project_service.create_project(
             org_id=org_id,
             project_data=project_data,
-            user_id=current_user.id,
+            user_id=user_id,
             db=db
         )
         return project
@@ -70,9 +76,12 @@ async def get_project(
 ):
     """Get project details"""
     try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
         project = await project_service.get_project(
             project_id=project_id,
-            user_id=current_user.id,
+            user_id=user_id,
             db=db
         )
         if not project:
@@ -98,9 +107,12 @@ async def get_project_dashboard(
 ):
     """Get project dashboard with analytics"""
     try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
         dashboard = await project_service.get_project_dashboard(
             project_id=project_id,
-            user_id=current_user.id,
+            user_id=user_id,
             db=db
         )
         return dashboard

@@ -2,9 +2,16 @@
 Project management service
 """
 
-from typing import List, Optional
+import asyncio
+import uuid
+from datetime import datetime
+from typing import Dict, List, Optional
 
 from services.api.schemas.projects import ProjectCreate, ProjectResponse, ProjectDashboardResponse
+
+
+_projects_by_org: Dict[str, List[ProjectResponse]] = {}
+_project_lock = asyncio.Lock()
 
 
 class ProjectService:
@@ -12,19 +19,26 @@ class ProjectService:
     
     async def get_organization_projects(self, org_id: str, user_id: str, db) -> List[ProjectResponse]:
         """Get projects for organization"""
-        # TODO: Implement database query
-        return []
+        async with _project_lock:
+            return list(_projects_by_org.get(org_id, []))
     
     async def create_project(self, org_id: str, project_data: ProjectCreate, user_id: str, db) -> ProjectResponse:
         """Create new project"""
-        # TODO: Implement database insertion
-        return ProjectResponse(
-            id="mock_project_id",
+        project = ProjectResponse(
+            id=str(uuid.uuid4()),
             name=project_data.name,
             description=project_data.description,
             status="active",
-            created_at="2024-01-16T20:01:00Z"
+            repository_count=0,
+            last_activity=None,
+            created_at=datetime.utcnow(),
         )
+
+        async with _project_lock:
+            org_projects = _projects_by_org.setdefault(org_id, [])
+            org_projects.append(project)
+
+        return project
     
     async def get_project(self, project_id: str, user_id: str, db) -> Optional[ProjectResponse]:
         """Get project details"""

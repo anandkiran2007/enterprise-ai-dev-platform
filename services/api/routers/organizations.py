@@ -25,7 +25,10 @@ async def get_organizations(
 ):
     """Get user's organizations"""
     try:
-        orgs = await org_service.get_user_organizations(current_user.id, db)
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
+        orgs = await org_service.get_user_organizations(user_id, db)
         return orgs
     except Exception as e:
         raise HTTPException(
@@ -44,7 +47,7 @@ async def create_organization(
     try:
         org = await org_service.create_organization(
             org_data=org_data,
-            user_id=current_user.id,
+            user_id=(current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)),
             db=db
         )
         return org
@@ -63,8 +66,11 @@ async def get_organization_members(
 ):
     """Get organization members"""
     try:
+        user_id = current_user.get("id") if isinstance(current_user, dict) else getattr(current_user, "id", None)
+        if not user_id:
+            raise Exception("Invalid user context")
         # Check if user is member
-        if not await org_service.is_member(org_id, current_user.id, db):
+        if not await org_service.is_member(org_id, user_id, db):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Not a member of this organization"
