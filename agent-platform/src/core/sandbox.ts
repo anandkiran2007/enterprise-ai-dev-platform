@@ -29,7 +29,8 @@ export class ExecutionSandbox {
         image: string,
         script: string,
         workDir?: string,
-        timeoutMs: number = 30000
+        timeoutMs: number = 30000,
+        networkEnabled: boolean = false
     ): Promise<SandboxResult> {
         const startTime = Date.now();
         console.log(`[Sandbox] Preparing to run in ${image}...`);
@@ -46,8 +47,8 @@ export class ExecutionSandbox {
                 Tty: false,
                 HostConfig: {
                     AutoRemove: false, // Manual removal
-                    Memory: 512 * 1024 * 1024,
-                    NetworkMode: 'none',
+                    Memory: 1024 * 1024 * 1024, // Increased to 1GB for Browser
+                    NetworkMode: networkEnabled ? 'host' : 'none', // Allow host networking for localhost access
                 }
             };
 

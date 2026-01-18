@@ -92,29 +92,44 @@ export class QAEngineerAgent extends BaseAgent {
 
         if (match && match[1]) {
             testCode = match[1].trim();
+            // Docker Mac Networking Fix: Ensure we hit the host machine
+            testCode = testCode.replace(/localhost:3000/g, 'host.docker.internal:3000');
             console.log('[QA Engineer] Successfully extracted code block from LLM response.');
         } else {
             console.error('[QA Engineer] ❌ No valid code block found in LLM response.');
             throw new Error('LLM Failed to generate valid code block. Response did not contain markdown code markers.');
         }
 
-        console.log('[QA Engineer] Test Code Generated. Preparing Sandbox...');
+        console.log('[QA Engineer] Test Code Content Preview:\n', testCode.substring(0, 500) + '...');
 
         // 2. Prepare Sandbox Context
         const tempDir = path.join(process.cwd(), 'temp_execution', `qa_${Date.now()}`);
         if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir, { recursive: true });
 
-        // Write test file
-        fs.writeFileSync(path.join(tempDir, 'test_runner.js'), testCode);
+        // Write test file (Use .spec.js for Playwright convention)
+        const testFileName = 'test_app.spec.js';
+        fs.writeFileSync(path.join(tempDir, testFileName), testCode);
 
         // 3. Execute in Sandbox
         const sandbox = ExecutionSandbox.getInstance();
-        console.log(`[QA Engineer] Running in Sandbox (node:18-alpine)...`);
+        const playwrightImage = 'mcr.microsoft.com/playwright:v1.41.0-focal';
+        console.log(`[QA Engineer] Running in Sandbox (${playwrightImage})...`);
+
+        const setupAndRunCmd = `
+            npm install -D @playwright/test@1.41.0 && 
+            npx playwright test /app/${testFileName} --reporter=list
+        `;
+
+        // Note: The LLM generates 'import ...', so we need package.json type: module or use .mjs config?
+        // Simpler: Just rely on npx playwright test handling it, or force TS/JS compilation.
+        // For now, let's assume the LLM generates valid JS/TS that playwright can ingest.
 
         const result = await sandbox.runScript(
-            'node:18-alpine',
-            `node /app/test_runner.js`,
-            tempDir
+            playwrightImage,
+            setupAndRunCmd,
+            tempDir,
+            120000, // 2 minute timeout for download + run
+            true // Enable Network
         );
 
         console.log(`[QA Engineer] Sandbox Execution Complete.`);

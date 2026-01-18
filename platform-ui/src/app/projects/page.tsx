@@ -22,7 +22,7 @@ export default function ProjectsPage() {
         const headers: Record<string, string> = {};
         if (uid) headers['x-user-id'] = uid;
 
-        fetch('http://localhost:3000/api/projects', { headers })
+        fetch('http://localhost:4000/api/projects', { headers })
             .then(res => res.json())
             .then(data => {
                 if (!Array.isArray(data)) throw new Error("Invalid response");
@@ -45,7 +45,7 @@ export default function ProjectsPage() {
         if (uid) headers['x-user-id'] = uid;
 
         try {
-            await fetch('http://localhost:3000/api/project/load', {
+            await fetch('http://localhost:4000/api/project/load', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ projectId })

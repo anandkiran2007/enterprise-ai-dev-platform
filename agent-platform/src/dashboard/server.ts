@@ -8,7 +8,7 @@ import { IStorageAdapter } from '../core/storage';
 
 export class DashboardServer {
     private app = express();
-    private port = 3000;
+    private port = 4000;
     private memory: ProjectMemory;
     private eventBus: IEventBus;
     private storage: IStorageAdapter;

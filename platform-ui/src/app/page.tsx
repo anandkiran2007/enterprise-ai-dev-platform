@@ -189,36 +189,9 @@ export default function Dashboard() {
             </h1>
             <p className="text-gray-400 text-sm mt-1">Project ID: <span className="font-mono text-xs">{memory.project_id}</span></p>
           </div>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setShowConfig(true)}
-              className="p-2 rounded-full bg-gray-900 border border-gray-800 text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
-              title="Settings"
-            >
-              <Settings size={20} />
-            </button>
 
-
-            <div className="bg-gray-900 px-4 py-2 rounded-full border border-gray-800 flex items-center gap-2">
-              <span className="text-sm font-medium">{memory.current_phase.toUpperCase()} PHASE</span>
-            </div>
-
-            <div className="bg-gray-900 rounded-full border border-gray-800">
-              <UserButton afterSignOutUrl="/" />
-            </div>
-
-            {/* GitHub Repo Button */}
-            {memory.living_documents.github_repo && (
-              <a
-                href={memory.living_documents.github_repo.full_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-gray-900 px-4 py-2 rounded-full border border-gray-800 flex items-center gap-2 hover:bg-gray-800 hover:border-gray-600 transition-colors"
-              >
-                <Github size={18} className="text-white" />
-                <span className="text-sm font-medium text-white">View Code</span>
-              </a>
-            )}
+          <div className="bg-gray-900 px-4 py-2 rounded-full border border-gray-800 flex items-center gap-2">
+            <span className="text-sm font-medium text-blue-400">{memory.current_phase.toUpperCase()} PHASE</span>
           </div>
         </div>
 
@@ -325,6 +298,18 @@ export default function Dashboard() {
             const context = memory.agent_context_pointers[role];
             const isWorking = context && context.currently_working_on && context.currently_working_on !== 'idle';
 
+            const formatRole = (r: string) => {
+              const map: Record<string, string> = {
+                'product_owner': 'Product Owner',
+                'ux_designer': 'UX Designer',
+                'backend_sde': 'Backend SDE',
+                'frontend_sde': 'Frontend SDE',
+                'qa_engineer': 'QA Engineer',
+                'devops': 'DevOps Engineer'
+              };
+              return map[r] || r.replace('_', ' ');
+            };
+
             return (
               <motion.div
                 key={role}
@@ -338,7 +323,7 @@ export default function Dashboard() {
                     <div className={`p-2 rounded-lg ${isWorking ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-800 text-gray-500'}`}>
                       <Cpu size={20} />
                     </div>
-                    <h3 className="font-semibold capitalize">{role.replace('_', ' ')}</h3>
+                    <h3 className="font-semibold">{formatRole(role)}</h3>
                   </div>
                   {isWorking && (
                     <span className="text-xs text-blue-400 animate-pulse">Processing...</span>
